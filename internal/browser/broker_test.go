@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -10,6 +11,16 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+type mockTransport struct {
+	ids []BrowserTaskID
+	err error
+}
+
+func (m *mockTransport) NotifyQueued(_ context.Context, id BrowserTaskID) error {
+	m.ids = append(m.ids, id)
+	return m.err
+}
 
 func TestStubFailsClosed(t *testing.T) {
 	var runner BrowserTaskRunner = StubRunner{}
@@ -76,12 +87,27 @@ func TestBrokerIntegration(t *testing.T) {
 			}
 		})
 	}
-	id, err := broker.Dispatch(ctx, task)
+	transport := &mockTransport{}
+	adapter := HarnessAdapter{Broker: broker, Transport: transport}
+	id, err := adapter.Dispatch(ctx, task)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := broker.Dispatch(ctx, task); err == nil {
+	if len(transport.ids) != 1 || transport.ids[0] != id {
+		t.Fatal("transport did not receive queued task ID")
+	}
+	if _, err := adapter.Dispatch(ctx, task); err == nil {
 		t.Fatal("duplicate callback accepted")
+	}
+	failedTask := task
+	failedTask.CallbackID += "-failed-notification"
+	transport.err = errors.New("offline")
+	failedID, err := adapter.Dispatch(ctx, failedTask)
+	if err == nil || failedID == 0 {
+		t.Fatal("failed notification must return the durable task ID")
+	}
+	if state, err := broker.Status(ctx, failedID); err != nil || state != Queued {
+		t.Fatalf("failed notification lost task: %q, %v", state, err)
 	}
 	otherDB, err := sql.Open("pgx", databaseURL)
 	if err != nil {

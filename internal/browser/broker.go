@@ -146,3 +146,41 @@ func (StubRunner) Status(context.Context, BrowserTaskID) (BrowserTaskStatus, err
 func (StubRunner) Cancel(context.Context, BrowserTaskID) error {
 	return errors.New("browser harness is not configured")
 }
+
+// HarnessTransport signals that a durable task is available. It does not carry
+// browser instructions or execute browser actions.
+type HarnessTransport interface {
+	NotifyQueued(context.Context, BrowserTaskID) error
+}
+
+// HarnessAdapter persists a task before notifying the harness.
+type HarnessAdapter struct {
+	Broker    Broker
+	Transport HarnessTransport
+}
+
+// Dispatch queues the task, then signals the transport. If notification fails,
+// the returned task ID remains queued for reconciliation.
+func (a HarnessAdapter) Dispatch(ctx context.Context, task BrowserTask) (BrowserTaskID, error) {
+	if a.Transport == nil {
+		return 0, errors.New("browser transport is not configured")
+	}
+	id, err := a.Broker.Dispatch(ctx, task)
+	if err != nil {
+		return 0, err
+	}
+	if err := a.Transport.NotifyQueued(ctx, id); err != nil {
+		return id, fmt.Errorf("notify browser harness: %w", err)
+	}
+	return id, nil
+}
+
+// Status returns the durable broker state.
+func (a HarnessAdapter) Status(ctx context.Context, id BrowserTaskID) (BrowserTaskStatus, error) {
+	return a.Broker.Status(ctx, id)
+}
+
+// Cancel cancels a task that has not been dispatched to a browser.
+func (a HarnessAdapter) Cancel(ctx context.Context, id BrowserTaskID) error {
+	return a.Broker.Cancel(ctx, id)
+}

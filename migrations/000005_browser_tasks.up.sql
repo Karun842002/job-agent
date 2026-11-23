@@ -15,6 +15,11 @@ CREATE TABLE browser_tasks (
     policy_version bigint NOT NULL,
     deadline timestamptz NOT NULL,
     callback_id text NOT NULL UNIQUE,
-    status text NOT NULL CHECK (status IN ('QUEUED', 'CANCELLED')),
+    status text NOT NULL CHECK (status IN
+        ('CREATED', 'POLICY_CHECKED', 'QUEUED', 'RUNNING', 'AWAITING_USER',
+         'SUCCEEDED', 'FAILED', 'UNKNOWN', 'CANCELLED')),
+    session_id text,
+    lease_until timestamptz,
+    evidence_ref uuid,
     created_at timestamptz NOT NULL DEFAULT now()
 );
