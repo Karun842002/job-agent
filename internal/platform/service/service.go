@@ -14,6 +14,8 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"go.opentelemetry.io/otel"
+	"karun.tech/jobagent/internal/platform/langfuse"
 	"karun.tech/jobagent/internal/platform/observability"
 )
 
@@ -49,6 +51,22 @@ func Run(defaultAddress string) error {
 		return errors.New("invalid database configuration")
 	}
 	defer db.Close()
+
+	if endpoint := os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"); endpoint != "" {
+		provider, err := langfuse.NewProvider(context.Background(), endpoint)
+		if err != nil {
+			observability.Logger(os.Stderr).Warn("telemetry_setup_failed")
+		} else {
+			otel.SetTracerProvider(provider)
+			defer func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := provider.Shutdown(ctx); err != nil {
+					observability.Logger(os.Stderr).Warn("telemetry_shutdown_failed")
+				}
+			}()
+		}
+	}
 
 	address := os.Getenv("HTTP_ADDR")
 	if address == "" {

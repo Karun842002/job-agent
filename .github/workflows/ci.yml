@@ -52,3 +52,26 @@ jobs:
       - name: Stop services
         if: always()
         run: docker compose down -v
+
+  collector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Start local trace stack
+        run: docker compose --profile observability up -d jaeger otel-collector
+      - name: Verify redacted collector export
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -s -o /dev/null http://127.0.0.1:4318/; then break; fi
+            sleep 1
+          done
+          curl -s -o /dev/null http://127.0.0.1:4318/
+          gateway=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
+          TEST_OTEL_MOCK_LISTEN="${gateway}:4319" TEST_OTEL_COLLECTOR="http://127.0.0.1:4318/v1/traces" go test -count=1 -run TestCollectorRedactsGeneration ./internal/platform/langfuse
+      - name: Stop services
+        if: always()
+        run: docker compose --profile observability down
