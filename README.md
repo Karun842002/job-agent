@@ -1,36 +1,14 @@
-# ADR-0001: Use deterministic cron for company discovery and job polling
+# Job Agent
 
-- **Status:** Accepted (existing product direction)
-- **Recorded:** 2026-11-23
-- **Decision source:** Previously confirmed project requirement; this record documents the already adopted approach, not a new agent approval
-- **Affected specification:** `PHASED_SPEC.md` §1, §2, §7 and §9; `FR-33`, `FR-34`
-- **Related Issues:** To be linked when implementation Issues are created
-- **Supersedes:** None
+Job Agent is a Go project for job discovery, CV tailoring, and application workflows. See the [phased specification](PHASED_SPEC.md) for the product scope and [AGENTS.md](AGENTS.md) for the development workflow and decision history.
 
-## Context
+## Build and test
 
-Company and ATS board discovery, public job polling and historical-run monitoring are frequent, predictable, data-driven tasks. Running an LLM or coding agent on every scheduled tick adds cost and unnecessary nondeterminism. A separate monitor is required to detect silent failures and stale sources.
+Install Go 1.22.2 or newer and Make. From a clean checkout:
 
-## Decision
+```sh
+make build
+make test
+```
 
-Implement discovery, polling and history-monitoring as **bounded, one-shot deterministic Go CLIs run by OS cron**. These paths make **zero LLM calls** and never synchronously launch a browser or coding agent. Difficult dynamic sites become explicit exception records for a separately authorised browser workflow. Retain Temporal for downstream application or human-approval workflows, not polling schedules.
-
-## Alternatives considered
-
-- **Agent-driven every poll:** flexible but incurs token cost and nondeterministic execution; rejected for regular polling.
-- **Temporal for scheduled polling:** durable, but unnecessary scheduling infrastructure for simple periodic reads in this deployment; not selected.
-
-## Consequences
-
-- Easier cost prediction, reproducibility and fixture-based testing; no tokens consumed on recurring discovery.
-- Must provide cron run history, watchdog monitoring independent of producer process where practical, safe concurrency/leases, rate limits and alerting for missed ticks.
-- Dynamic or browser-only sources are not resolved inline and require asynchronous exception handling.
-
-## Clarification and source fidelity
-
-This decision was explicitly provided as a project requirement by the human owner. No verbatim Q&A transcript is included; future changes require a new ADR with dated interview questions, verified answers and approval evidence.
-
-## Linked changes
-
-- Specification: already documents the chosen design.
-- Implementation Issues and PRs: pending.
+Both commands use Go's read-only module mode. When adding or updating a dependency, run `go mod tidy` and commit the resulting changes to `go.mod` and `go.sum`. The module currently has no external Go dependencies.
