@@ -5,12 +5,29 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+type autosaveTransport struct{ url string }
+
+func (m autosaveTransport) NotifyQueued(ctx context.Context, _ BrowserTaskID) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.url, nil)
+	if err != nil {
+		return err
+	}
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	return response.Body.Close()
+}
 
 type mockTransport struct {
 	ids []BrowserTaskID
@@ -95,6 +112,27 @@ func TestBrokerIntegration(t *testing.T) {
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE source_policies SET discovery_allowed = true WHERE source = $1", source); err != nil {
 		t.Fatal(err)
+	}
+	var writes atomic.Int64
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writes.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer remote.Close()
+	probe := autosaveTransport{url: remote.URL}
+	if err := probe.NotifyQueued(ctx, 0); err != nil || writes.Load() != 1 {
+		t.Fatal("autosave probe failed")
+	}
+	writes.Store(0)
+	autosave := HarnessAdapter{Broker: broker, Transport: probe}
+	fill := task
+	fill.Action = "FILL"
+	fill.AllowedActions = []string{"FILL"}
+	if _, err := autosave.Dispatch(ctx, fill); err == nil {
+		t.Fatal("AUDIT form fill was accepted")
+	}
+	if writes.Load() != 0 {
+		t.Fatal("denied form fill reached the autosave transport")
 	}
 	transport := &mockTransport{}
 	adapter := HarnessAdapter{Broker: broker, Transport: transport}
