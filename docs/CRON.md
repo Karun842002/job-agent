@@ -1,9 +1,16 @@
 # Cron entry points
 
 Build the command with `go build -o /path/to/job-agent ./cmd/job-agent`.
-The commands currently exit with an error because their implementations are
-pending. Do not install the examples until the discovery, polling and monitoring
-implementations are complete and configured.
+Without a fixture, commands exit with an error because their production
+implementations are pending. Do not install the examples until discovery,
+polling and monitoring are complete and configured.
+
+For offline verification, pass `--fixture /path/to/fixture.json` after
+`--once`. The JSON object accepts a `companies` array, an `as_of` RFC 3339
+timestamp, `max_age_seconds`, and a `runs` array with `job`, `outcome`,
+and `finished_at` fields. The synthetic monitor checks for a recent successful
+discovery and polling run. These fixture checks perform no network access and
+are not a production run-history monitor.
 
 For Linux or WSL with a running cron service, example entries are:
 
