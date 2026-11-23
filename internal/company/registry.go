@@ -4,9 +4,11 @@ package company
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/trace"
 	"karun.tech/jobagent/internal/audit"
@@ -28,11 +30,21 @@ type Seed struct {
 
 // Board identifies an ATS board belonging to a company.
 type Board struct {
-	ID        int64  `json:"id"`
-	CompanyID int64  `json:"company_id"`
-	Provider  string `json:"provider"`
-	Region    string `json:"region"`
-	Key       string `json:"board_key"`
+	ID        int64         `json:"id"`
+	CompanyID int64         `json:"company_id"`
+	Provider  string        `json:"provider"`
+	Region    string        `json:"region"`
+	Key       string        `json:"board_key"`
+	Metadata  BoardMetadata `json:"metadata"`
+}
+
+// BoardMetadata keeps observed data and operator overrides separate.
+type BoardMetadata struct {
+	State            string          `json:"state"`
+	Capabilities     json.RawMessage `json:"capabilities"`
+	Provenance       json.RawMessage `json:"provenance"`
+	LastVerifiedAt   *time.Time      `json:"last_verified_at"`
+	OperatorOverride json.RawMessage `json:"operator_override"`
 }
 
 // ErrInvalidInput identifies invalid registry input.
@@ -199,13 +211,14 @@ func (s Store) CreateBoard(ctx context.Context, board Board) (Board, error) {
 	if err := tx.Commit(); err != nil {
 		return Board{}, err
 	}
+	board.Metadata = BoardMetadata{State: "candidate", Capabilities: json.RawMessage("{}"), Provenance: json.RawMessage("{}"), OperatorOverride: json.RawMessage("{}")}
 	return board, nil
 }
 
 // GetBoard reads a board by ID.
 func (s Store) GetBoard(ctx context.Context, id int64) (Board, error) {
 	var board Board
-	err := s.DB.QueryRowContext(ctx, "SELECT id,company_id,provider,region,board_key FROM ats_boards WHERE id=$1", id).Scan(&board.ID, &board.CompanyID, &board.Provider, &board.Region, &board.Key)
+	err := s.DB.QueryRowContext(ctx, "SELECT id,company_id,provider,region,board_key,state,capabilities,provenance,last_verified_at,operator_override FROM ats_boards WHERE id=$1", id).Scan(&board.ID, &board.CompanyID, &board.Provider, &board.Region, &board.Key, &board.Metadata.State, &board.Metadata.Capabilities, &board.Metadata.Provenance, &board.Metadata.LastVerifiedAt, &board.Metadata.OperatorOverride)
 	return board, err
 }
 
@@ -277,7 +290,7 @@ func (s Store) ListSeeds(ctx context.Context, after int64) ([]Seed, error) {
 
 // ListBoards returns up to 100 boards after the supplied ID.
 func (s Store) ListBoards(ctx context.Context, after int64) ([]Board, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT id,company_id,provider,region,board_key FROM ats_boards WHERE id>$1 ORDER BY id LIMIT 100", after)
+	rows, err := s.DB.QueryContext(ctx, "SELECT id,company_id,provider,region,board_key,state,capabilities,provenance,last_verified_at,operator_override FROM ats_boards WHERE id>$1 ORDER BY id LIMIT 100", after)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +298,7 @@ func (s Store) ListBoards(ctx context.Context, after int64) ([]Board, error) {
 	boards := make([]Board, 0)
 	for rows.Next() {
 		var value Board
-		if err := rows.Scan(&value.ID, &value.CompanyID, &value.Provider, &value.Region, &value.Key); err != nil {
+		if err := rows.Scan(&value.ID, &value.CompanyID, &value.Provider, &value.Region, &value.Key, &value.Metadata.State, &value.Metadata.Capabilities, &value.Metadata.Provenance, &value.Metadata.LastVerifiedAt, &value.Metadata.OperatorOverride); err != nil {
 			return nil, err
 		}
 		boards = append(boards, value)

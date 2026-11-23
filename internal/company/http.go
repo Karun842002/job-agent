@@ -118,6 +118,10 @@ func Handler(store Store, token string) http.Handler {
 		if !decode(w, r, &value) {
 			return
 		}
+		if !emptyMetadata(value.Metadata) {
+			http.Error(w, "set metadata through its dedicated endpoint", http.StatusBadRequest)
+			return
+		}
 		value.ID = 0
 		result, err := store.CreateBoard(r.Context(), value)
 		respond(w, result, err, http.StatusCreated)
@@ -139,8 +143,23 @@ func Handler(store Store, token string) http.Handler {
 		if !decode(w, r, &value) {
 			return
 		}
+		if !emptyMetadata(value.Metadata) {
+			http.Error(w, "set metadata through its dedicated endpoint", http.StatusBadRequest)
+			return
+		}
 		value.ID = id
 		respond(w, nil, store.UpdateBoard(r.Context(), value), http.StatusNoContent)
+	})
+	mux.HandleFunc("PUT /api/v1/boards/{id}/metadata", func(w http.ResponseWriter, r *http.Request) {
+		id, ok := requestID(w, r)
+		if !ok {
+			return
+		}
+		var value BoardMetadata
+		if !decode(w, r, &value) {
+			return
+		}
+		respond(w, nil, store.SetBoardMetadata(r.Context(), id, value), http.StatusNoContent)
 	})
 	mux.HandleFunc("DELETE /api/v1/boards/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := requestID(w, r)
@@ -174,6 +193,11 @@ func Handler(store Store, token string) http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+func emptyMetadata(value BoardMetadata) bool {
+	return value.State == "" && len(value.Capabilities) == 0 && len(value.Provenance) == 0 &&
+		value.LastVerifiedAt == nil && len(value.OperatorOverride) == 0
 }
 
 func decode(w http.ResponseWriter, r *http.Request, value any) bool {

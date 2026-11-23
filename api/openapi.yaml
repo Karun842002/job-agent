@@ -147,6 +147,19 @@ paths:
       responses:
         '201': { description: Board created, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }
         '409': { description: Company or board conflict }
+  /api/v1/boards/{id}/metadata:
+    parameters: [{ $ref: '#/components/parameters/ID' }]
+    put:
+      summary: Replace observed board metadata and separate operator overrides
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardMetadata' }
+      responses:
+        '204': { description: Metadata updated }
+        '400': { description: Invalid metadata }
+        '404': { description: Board not found }
   /api/v1/boards/{id}:
     parameters: [{ $ref: '#/components/parameters/ID' }]
     get:
@@ -203,3 +216,15 @@ components:
         provider: { type: string }
         region: { type: string }
         board_key: { type: string }
+        metadata: { allOf: [{ $ref: '#/components/schemas/BoardMetadata' }], readOnly: true }
+    BoardMetadata:
+      type: object
+      required: [state, capabilities, provenance, operator_override]
+      properties:
+        state:
+          type: string
+          enum: [candidate, verified, degraded, inactive, blocked_by_policy, manual_review]
+        capabilities: { type: object }
+        provenance: { type: object }
+        last_verified_at: { type: string, format: date-time, nullable: true }
+        operator_override: { type: object }
