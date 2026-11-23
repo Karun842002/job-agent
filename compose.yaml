@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16.6
+    environment:
+      POSTGRES_USER: jobagent
+      POSTGRES_PASSWORD: jobagent-local
+      POSTGRES_DB: jobagent
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobagent -d jobagent"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    image: migrate/migrate:v4.18.3
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://jobagent:jobagent-local@postgres:5432/jobagent?sslmode=disable"]
+volumes:
+  postgres-data:
