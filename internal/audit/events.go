@@ -18,6 +18,11 @@ type Event struct {
 	TraceID          *string
 	StepRunID        *string
 	EvidenceRef      *string
+	CompanyID        *int64
+	JobID            *int64
+	ApplicationID    *int64
+	BeforeHash       *string
+	AfterHash        *string
 }
 
 var metadataToken = regexp.MustCompile(`^[a-zA-Z0-9_:-]{1,128}$`)
@@ -34,9 +39,11 @@ func Append(ctx context.Context, tx *sql.Tx, event Event) (int64, error) {
 	}
 	var id int64
 	err := tx.QueryRowContext(ctx, `INSERT INTO audit_events
-		(event_name, actor, cause, policy_snapshot_id, trace_id, step_run_id, evidence_ref)
-		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`, event.Name, event.Actor, event.Cause,
-		event.PolicySnapshotID, event.TraceID, event.StepRunID, event.EvidenceRef).Scan(&id)
+		(event_name, actor, cause, policy_snapshot_id, trace_id, step_run_id, evidence_ref,
+		company_id, job_id, application_id, before_hash, after_hash)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`, event.Name, event.Actor, event.Cause,
+		event.PolicySnapshotID, event.TraceID, event.StepRunID, event.EvidenceRef,
+		event.CompanyID, event.JobID, event.ApplicationID, event.BeforeHash, event.AfterHash).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("append audit event: %w", err)
 	}

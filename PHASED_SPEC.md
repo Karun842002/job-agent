@@ -656,7 +656,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 
 ## 8. API surface (initial)
 
-Use versioned JSON endpoints, typed request/response schemas and OpenAPI. All mutating endpoints require authentication, CSRF protection as applicable, and audit events.
+Use versioned JSON endpoints, typed request/response schemas and OpenAPI. All mutating endpoints require authentication, CSRF protection as applicable, and audit events. The single-user API uses a server-configured bearer token in the Authorization header, with loopback binding by default. See [ADR-0004](docs/adr/0004-api-authentication.md).
 
 | Method | Path | Purpose |
 |---|---|---|

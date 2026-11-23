@@ -41,7 +41,7 @@ func healthHandler(db pinger) http.Handler {
 }
 
 // Run serves liveness and database readiness checks until termination.
-func Run(defaultAddress string) error {
+func Run(defaultAddress string, routes func(*sql.DB) http.Handler) error {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		return errors.New("DATABASE_URL is required")
@@ -72,10 +72,19 @@ func Run(defaultAddress string) error {
 	if address == "" {
 		address = defaultAddress
 	}
+	handler := healthHandler(db)
+	if routes != nil {
+		mux := http.NewServeMux()
+		mux.Handle("/healthz", handler)
+		mux.Handle("/readyz", handler)
+		mux.Handle("/api/", routes(db))
+		handler = mux
+	}
 	server := &http.Server{
 		Addr:              address,
-		Handler:           observability.TraceHandler(healthHandler(db)),
+		Handler:           observability.TraceHandler(handler),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
