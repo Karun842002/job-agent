@@ -21,5 +21,4 @@ identify remaining work.
 
 ## Review
 
-Record the verification review score and any findings or fixes. Human approval
-and merge are required.
+Record the verification review score and any findings or fixes. Human review and manual merge are required.

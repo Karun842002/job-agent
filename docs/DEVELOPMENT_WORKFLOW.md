@@ -4,7 +4,7 @@ This document defines reusable **development process**, not job-application busi
 
 ## 1. Issue lifecycle and ownership
 
-`Draft Issue → Quality review → Revise (≤3 rounds) → Human approves Issue → Implement & test → Code verification → Fix (≤3 rounds) → Create PR → Human approves → Human merges`
+`Draft Issue → Quality review → Revise (≤3 rounds) → Human approves Issue → Implement & test → Code verification → Fix (≤3 rounds) → Create PR → Human reviews and merges`
 
 **Interrupt at any stage:** If the agent lacks confidence or a requirement/next move is unclear, pause affected work, mark the Issue `blocked`, ask targeted questions, and follow §3 before resuming. No score can replace a confirmed decision.
 
@@ -79,7 +79,7 @@ After each fix, rerun relevant tests and the review. Stop after three unsuccessf
 - A PR can contain **multiple related atomic commits**. Do not enforce one-commit-per-PR if it damages clarity.
 - Do not amend/rebase/force-push shared history without authorisation.
 - Open the PR **after** verifying all acceptance criteria. Check that each confirmed consequential decision is recorded in a linked, accepted ADR and cross-referenced in the Issue. Use `.github/pull_request_template.md`, link Issue and ADRs, include criterion-by-criterion evidence, commands and actual outcomes, risks/rollback, and follow-ups.
-- The agent must **never** approve or merge its PR, enable auto-merge or bypass branch protections. Human approval and manual merge are mandatory; any changed code after approval may require another review.
+- The agent must **never** approve or merge its PR, enable auto-merge or bypass branch protections. The human reviews and manually merges the PR. A separate GitHub approval is not required.
 - Consider the Issue delivered only after the PR is merged. Deferred scope remains a separately linked open Issue.
 
 ## 6. Completion and migration checks
@@ -100,7 +100,7 @@ The previous product specification mixed development-process requirements into i
 | `P0-005` | GitHub Issue template: `.github/ISSUE_TEMPLATE/implementation.md` |
 | `P0-006` | Requirements scoring and human approval rules (§2) |
 | `P0-007` | Verification rubric and PR template (§4–§5) |
-| `P0-008` | Protected branch/CI checks and human PR approval/merge (§5) |
+| `P0-008` | Protected branch/CI checks and human PR review/merge (§5) |
 | `P0-017` | Root `AGENTS.md` adopted, ADR index and template established (§3) |
 
 The product specification continues to contain the **business and runtime requirements**, while these process requirements are owned here. Any open Issue referring to a legacy process ID should link this section and retain its current acceptance criteria.
