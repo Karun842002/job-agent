@@ -87,6 +87,15 @@ func TestBrokerIntegration(t *testing.T) {
 			}
 		})
 	}
+	if _, err := db.ExecContext(ctx, "UPDATE source_policies SET discovery_allowed = false WHERE source = $1", source); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := broker.Dispatch(ctx, task); err == nil {
+		t.Fatal("denied source was accepted")
+	}
+	if _, err := db.ExecContext(ctx, "UPDATE source_policies SET discovery_allowed = true WHERE source = $1", source); err != nil {
+		t.Fatal(err)
+	}
 	transport := &mockTransport{}
 	adapter := HarnessAdapter{Broker: broker, Transport: transport}
 	id, err := adapter.Dispatch(ctx, task)

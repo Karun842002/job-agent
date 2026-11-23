@@ -120,7 +120,7 @@ func (b Broker) Status(ctx context.Context, id BrowserTaskID) (BrowserTaskStatus
 
 // Cancel cancels a queued task. Repeated cancellation is harmless.
 func (b Broker) Cancel(ctx context.Context, id BrowserTaskID) error {
-	result, err := b.DB.ExecContext(ctx, "UPDATE browser_tasks SET status = 'CANCELLED' WHERE id = $1", id)
+	result, err := b.DB.ExecContext(ctx, "UPDATE browser_tasks SET status = 'CANCELLED' WHERE id = $1 AND status IN ('QUEUED', 'CANCELLED')", id)
 	if err != nil {
 		return fmt.Errorf("cancel browser task: %w", err)
 	}
