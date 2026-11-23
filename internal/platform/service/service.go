@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +13,8 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"karun.tech/jobagent/internal/platform/observability"
 )
 
 type pinger interface {
@@ -55,7 +56,7 @@ func Run(defaultAddress string) error {
 	}
 	server := &http.Server{
 		Addr:              address,
-		Handler:           healthHandler(db),
+		Handler:           observability.TraceHandler(healthHandler(db)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -78,7 +79,7 @@ func Run(defaultAddress string) error {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("serve health endpoints: %w", err)
 		}
-		slog.Info("shutdown complete")
+		observability.Logger(os.Stdout).Info("shutdown complete")
 		return nil
 	}
 }
