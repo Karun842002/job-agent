@@ -60,4 +60,14 @@ func TestSourcePolicyIntegration(t *testing.T) {
 			t.Errorf("allowed %s: %v", capability, err)
 		}
 	}
+	closedDB, err := sql.Open("pgx", databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := closedDB.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckSource(ctx, closedDB, source, Discovery); err == nil {
+		t.Fatal("closed database must fail closed")
+	}
 }
