@@ -444,7 +444,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 **Objective:** Build the foundational Go repository, local development environment and explicit source/submission policy before integrating sites.
 
 **Deliverables**
-- [ ] **[P0-001]** Repository structure from §2.2, Go module, reproducible dependency locks and `Makefile`/task runner.
+- [x] **[P0-001]** Repository structure from §2.2, Go module, reproducible dependency locks and `Makefile`/task runner.
 - [ ] **[P0-002]** API and worker binaries with graceful shutdown and `/healthz`/`/readyz`.
 - [ ] **[P0-003]** Docker Compose for PostgreSQL (Temporal optional until Phase 3); versioned SQL migrations.
 - [ ] **[P0-004]** Cron runtime documentation and Linux/WSL crontab template; compile deterministic `discover-companies`, `poll-boards` and `discovery-monitor` Go CLIs.

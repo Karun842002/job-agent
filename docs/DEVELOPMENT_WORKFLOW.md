@@ -8,12 +8,19 @@ This document defines reusable **development process**, not job-application busi
 
 **Interrupt at any stage:** If the agent lacks confidence or a requirement/next move is unclear, pause affected work, mark the Issue `blocked`, ask targeted questions, and follow §3 before resuming. No score can replace a confirmed decision.
 
-Recommended issue labels: `needs-quality-review`, `needs-revision`, `awaiting-issue-approval`, `approved-for-implementation`, `in-progress`, `blocked`. Scores and each review's evidence go in the Issue comments; there is no duplicate state ledger.
+Recommended issue labels: `needs-quality-review`, `needs-revision`, `awaiting-issue-approval`, `approved-for-implementation`, `in-progress`, `in-review`, `blocked`. Scores and each review's evidence go in the Issue comments; there is no duplicate state ledger.
 
 - Use `.github/ISSUE_TEMPLATE/implementation.md` to create one narrowly scoped Issue.
 - Give each requirement an ID (`FR-*`) and each phase deliverable a reference (`Pn-NNN`) where applicable.
 - GitHub Issue acceptance criteria are authoritative **for an approved task**, but they must be consistent with `PHASED_SPEC.md`. Escalate disagreement; do not silently choose either side.
 - Only a **human approval comment** and human-applied/confirmed `approved-for-implementation` label permit coding to start. Agent-created labels or its own comments do not count.
+
+### Keep GitHub Issue status current
+
+- Record human approval on the Issue and apply `approved-for-implementation` after human confirmation. Update the Issue when work starts and apply `in-progress`.
+- When a blocker stops work, apply `blocked`, replace the active work status, and record the blocker, affected acceptance criteria, and what would unblock it. Clear the label when work resumes.
+- When the PR opens, replace `in-progress` with `in-review`. Link the PR and record acceptance-check results on the Issue. Keep the Issue open through review.
+- After verifying the PR merged and all Issue acceptance criteria are satisfied, record the merged PR and verification evidence, clear active status labels, and verify the Issue is closed. Use a closing reference for a PR that completes the Issue. If work remains, keep the Issue open and record the remaining scope and current status.
 
 ## 2. Requirements quality rubric (advisory 0–100)
 

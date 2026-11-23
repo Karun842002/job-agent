@@ -22,6 +22,8 @@ Read only the relevant spec sections, accepted ADRs, issue and impacted source f
 
 Do not introduce a separate task database, PA agents, agent coordinator, leases or custom Codex hooks for this review process. GitHub Issues, PRs and Git history are the durable development records.
 
+Keep the GitHub Issue current at approval, implementation start, blockers, PR review and verified completion. Follow the [Issue status workflow](docs/DEVELOPMENT_WORKFLOW.md#keep-github-issue-status-current) and confirm closure after merge when all acceptance criteria are satisfied.
+
 ## 2. Uncertainty gate and ADR decision ledger (MUST)
 
 **Stop before guessing.** At any point, if the next action is unclear or confidence is insufficient to justify it from the approved Issue, product spec, accepted ADRs and observed evidence, **pause the affected work and ask the human**. Triggers include ambiguous or contradictory requirements, unclear scope, multiple materially different design options, uncertain API/site permissions, risky migrations, destructive operations, security/privacy concerns, and unclear acceptance or test expectations. Never silently choose a default, change the requirement, invent an answer, or use a quality score to bypass this gate. Unrelated, independently safe work may continue; mark the affected Issue `blocked` and record the unresolved question.
