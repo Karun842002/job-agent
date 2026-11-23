@@ -4,7 +4,7 @@ Job Agent is a Go project for job discovery, CV tailoring, and application workf
 
 ## Build and test
 
-Install Go 1.22.2 or newer and Make. From a clean checkout:
+Install Go 1.26.11 or newer and Make. From a clean checkout:
 
 ```sh
 make build
