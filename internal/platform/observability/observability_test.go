@@ -16,10 +16,16 @@ import (
 
 func TestJSONLogging(t *testing.T) {
 	var buf bytes.Buffer
-	Logger(&buf).Info("startup", "service", "api")
+	Logger(&buf).Info("startup", "service", "api", "email", "person@example.com", "error", "Bearer secret")
 	var event map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
 		t.Fatal(err)
+	}
+	if _, ok := event["email"]; ok {
+		t.Fatal("sensitive attribute was logged")
+	}
+	if _, ok := event["error"]; ok {
+		t.Fatal("untrusted error was logged")
 	}
 	if event["msg"] != "startup" || event["service"] != "api" {
 		t.Fatalf("event: %v", event)

@@ -25,6 +25,9 @@ func TestAppendAndProtectIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
+	if _, err := Append(ctx, tx, Event{Name: "step_started", Actor: "person@example.com", Cause: "test"}); err == nil {
+		t.Fatal("personal data accepted as audit metadata")
+	}
 	trace := "4bf92f3577b34da6a3ce929d0e0e4736"
 	step := "step-1"
 	evidence := "a6f55038-c5bd-4f67-8937-f049f3440592"

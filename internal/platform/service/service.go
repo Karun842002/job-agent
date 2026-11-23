@@ -79,7 +79,7 @@ func Run(defaultAddress string) error {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("serve health endpoints: %w", err)
 		}
-		observability.Logger(os.Stdout).Info("shutdown complete")
+		observability.Logger(os.Stdout).Info("shutdown_complete")
 		return nil
 	}
 }

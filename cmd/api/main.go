@@ -11,7 +11,7 @@ import (
 func main() {
 	slog.SetDefault(observability.Logger(os.Stderr))
 	if err := service.Run(":8080"); err != nil {
-		slog.Error("api stopped", "error", err)
+		slog.Error("api_stopped", "error_class", "service_failure")
 		os.Exit(1)
 	}
 }

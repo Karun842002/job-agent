@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -15,9 +16,43 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Logger returns a JSON logger. Callers must avoid untrusted or sensitive content.
+var safeToken = regexp.MustCompile(`^[a-zA-Z0-9_:-]{1,128}$`)
+
+var allowedFields = map[string]bool{
+	"service": true, "environment": true, "event_name": true, "trace_id": true,
+	"span_id": true, "run_id": true, "workflow_id": true, "step_run_id": true,
+	"policy_version": true, "step_key": true, "mode": true, "outcome": true,
+	"error_class": true, "reason_code": true, "provider": true, "duration_ms": true,
+}
+
+// Logger emits JSON using a bounded allowlist of structured metadata fields.
+// Callers must still avoid putting secrets or personal data into allowed fields.
 func Logger(output io.Writer) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(output, nil))
+	return slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
+			if attr.Key == slog.TimeKey || attr.Key == slog.LevelKey {
+				return attr
+			}
+			if attr.Key != slog.MessageKey && !allowedFields[attr.Key] {
+				return slog.Attr{}
+			}
+			if attr.Value.Kind() == slog.KindString {
+				if !safeToken.MatchString(attr.Value.String()) {
+					return slog.String(attr.Key, "redacted")
+				}
+				return attr
+			}
+			if attr.Key == slog.MessageKey {
+				return slog.String(attr.Key, "redacted")
+			}
+			switch attr.Value.Kind() {
+			case slog.KindInt64, slog.KindUint64, slog.KindFloat64, slog.KindBool, slog.KindDuration:
+				return attr
+			default:
+				return slog.String(attr.Key, "redacted")
+			}
+		},
+	}))
 }
 
 // TraceHandler extracts W3C trace context and starts a server span.
