@@ -967,7 +967,7 @@ A phase is **done** only when implementation, tests, docs, observability, rollba
 7. **Work authorisation / compensation:** user-entered verified preferences, not inference.
 8. **Board-coverage metrics:** report observed boards, not the false promise of universal employer coverage.
 9. **Submission API:** expect manual-only in most cases; employer-level credentials must be verified before implementation.
-10. **Retention:** choose operational and privacy retention windows before real candidate data is ingested.
+10. **Retention:** automatically delete personal data, diagnostic logs and traces, and audit events 24 hours after creation, including copies. Enforce and verify this policy before ingesting real candidate data. See [ADR-0003](docs/adr/0003-24-hour-retention.md).
 11. **Harness connection:** the agent runtime supports a system browser but its exact invocation/callback interface is deployment-specific; keep a mockable adapter and do not invent an SDK.
 12. **Tier defaults:** company and role tiers are user-defined; examples in §13 are illustrative and disabled/unassigned states must fail closed.
 13. **Dry run:** always simulate externally visible writes; some browser forms autosave and cannot safely be filled in production audit mode.
