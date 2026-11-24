@@ -409,7 +409,7 @@ Not every job progresses through all states. Allow closure/expiration/rejection 
 | FR-27 | Browser fallback for dynamic discovery, job details and permitted form tasks | Mock harness + local dynamic pages |
 | FR-28 | Enforce capability gating separately for browser `READ`, `FILL`, `UPLOAD`, `SUBMIT` | Denial and policy escalation tests |
 | FR-29 | Emit step-level JSON events and join Temporal, browser and application traces | End-to-end correlation tests |
-| FR-30 | Export redacted GenAI OTel traces to Langfuse and record cost/tokens/evaluations | Local OTLP capture test + Langfuse smoke check |
+| FR-30 | Export redacted GenAI OTel traces and record cost/tokens/evaluations; remote export is disabled pending a verified compliant backend (ADR-0007) | Local OTLP capture test; remote smoke check after the gate is lifted |
 | FR-31 | User can inspect step history and policy decisions per job/application | Timeline UI and pagination tests |
 | FR-32 | Version policy changes and pause at safe boundaries after disabling a tier | In-flight workflow / policy-change tests |
 | FR-33 | Execute company/ATS discovery and board polling as scheduled one-shot Go commands under crontab | Cron command integration tests; verify no model/agent/browser endpoints called |
@@ -787,7 +787,7 @@ Example event (values illustrative):
 
 - Instrument HTTP server/client, provider adapters, Temporal dispatch/Activities, DB, LLM gateway, document renderer, browser broker, policy resolver and notification dispatcher. Propagate W3C trace context (`traceparent`/`tracestate`) and stable business correlation IDs across broker callbacks; do not use dynamic company/job IDs as metric labels.
 - Recommended pipeline: Go OpenTelemetry SDK → OpenTelemetry Collector with redaction/filtering/queue/retry → operational traces (Tempo/Jaeger), metrics (Prometheus-compatible/Grafana), logs (Loki or other log backend). **Use a dedicated filtered OTLP/HTTP traces exporter to Langfuse for GenAI spans**, so operational traces and LLM telemetry can be correlated but do not inadvertently copy all personal information.
-- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts.
+- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts. Remote telemetry export is disabled pending selection and verification of a backend that satisfies the 24-hour deletion policy (ADR-0007); synthetic local mock validation remains available.
 - Set role-based access controls and retention for logs, traces, images and audit events. Redact tokens, cookies, browser profiles, emails, CV details, full prompt content and form values by default.
 
 ### 12.3 Langfuse LLM observability (required)
