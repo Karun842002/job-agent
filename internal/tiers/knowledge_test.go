@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -210,6 +211,15 @@ func TestSyntheticKnowledgeToProposalIntegration(t *testing.T) {
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM tier_proposals WHERE company_id=$1", company).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("proposal count=%d err=%v", count, err)
 	}
+	var savedEvidence string
+	if err := db.QueryRowContext(ctx, "SELECT evidence::text FROM tier_proposals WHERE id=$1", id).Scan(&savedEvidence); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{"synthetic evidence", obs.Location, obs.Title, obs.Skills[0]} {
+		if strings.Contains(savedEvidence, value) {
+			t.Fatal("proposal evidence contains raw candidate or observation values")
+		}
+	}
 	in.RoleFamilyID = &role
 	id, created, err = store.ProposeObservation(ctx, in, obs)
 	if err != nil || !created || id == 0 {
@@ -234,6 +244,15 @@ func TestSyntheticKnowledgeToProposalIntegration(t *testing.T) {
 	preview, created, err := store.ProposeObservation(ctx, in, obs)
 	if err != nil || created || preview == 0 {
 		t.Fatalf("AUDIT preview=%d created=%v err=%v", preview, created, err)
+	}
+	var previewDiff string
+	if err := db.QueryRowContext(ctx, "SELECT diff::text FROM audit_previews WHERE id=$1", preview).Scan(&previewDiff); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{"synthetic evidence", obs.Location, obs.Title, obs.Skills[0]} {
+		if strings.Contains(previewDiff, value) {
+			t.Fatal("audit preview contains raw candidate or observation values")
+		}
 	}
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM tier_proposals WHERE role_family_id=$1", role).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("AUDIT changed role proposals count=%d err=%v", count, err)
