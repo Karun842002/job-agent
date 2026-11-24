@@ -3,13 +3,94 @@ package tiers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"karun.tech/jobagent/internal/policy"
 )
+
+func TestProposePolicyAndDeduplicationIntegration(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("TEST_DATABASE_URL is required for PostgreSQL integration")
+	}
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	host := "proposal-" + suffix + ".example"
+	var company int64
+	if err := db.QueryRowContext(ctx, `INSERT INTO companies(name,domain) VALUES('fixture',$1) RETURNING id`, host).Scan(&company); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := db.ExecContext(ctx, "DELETE FROM tier_proposals WHERE company_id=$1", company); err != nil {
+			t.Error(err)
+		}
+		if _, err := db.ExecContext(ctx, "DELETE FROM companies WHERE id=$1", company); err != nil {
+			t.Error(err)
+		}
+		if _, err := db.ExecContext(ctx, "DELETE FROM source_policies WHERE source=$1", host); err != nil {
+			t.Error(err)
+		}
+	}()
+	version := time.Now().UnixNano()
+	if _, err := db.ExecContext(ctx, `INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)`, version); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,'tier_proposal','LIVE')`, version); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO source_policies(source,discovery_allowed) VALUES($1,true)`, host); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{DB: db}
+	in := ProposalInput{CompanyID: company, SourceURL: "https://" + host + "/careers", Evidence: RelevanceEvidence{Matches, Matches, Matches, Matches, NoMatch}, ExpiresAt: time.Now().Add(time.Hour)}
+	id, created, err := store.Propose(ctx, in)
+	if err != nil || !created || id == 0 {
+		t.Fatalf("first proposal id=%d created=%v err=%v", id, created, err)
+	}
+	_, created, err = store.Propose(ctx, in)
+	if err != nil || created {
+		t.Fatalf("duplicate created=%v err=%v", created, err)
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM tier_proposals WHERE company_id=$1", company).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("proposal count=%d err=%v", count, err)
+	}
+	if _, err := db.ExecContext(ctx, "UPDATE source_policies SET discovery_allowed=false WHERE source=$1", host); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Propose(ctx, in); !errors.Is(err, policy.ErrCapabilityDenied) {
+		t.Fatalf("denied source: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "UPDATE source_policies SET discovery_allowed=true WHERE source=$1", host); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetMode(ctx, ModeChange{StepKey: "tier_proposal", Mode: policy.Off}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Propose(ctx, in); !errors.Is(err, policy.ErrIntakeDenied) {
+		t.Fatalf("OFF mode: %v", err)
+	}
+	if _, err := store.SetMode(ctx, ModeChange{StepKey: "tier_proposal", Mode: policy.Audit}); err != nil {
+		t.Fatal(err)
+	}
+	preview, created, err := store.Propose(ctx, in)
+	if err != nil || created || preview == 0 {
+		t.Fatalf("AUDIT preview=%d created=%v err=%v", preview, created, err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM tier_proposals WHERE company_id=$1", company).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("AUDIT changed domain count=%d err=%v", count, err)
+	}
+}
 
 func TestListProposalsIntegration(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
