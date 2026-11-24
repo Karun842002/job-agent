@@ -21,6 +21,8 @@ This file is the **index**, not another requirements specification. Each accepte
 
 | [ADR-0008](0008-retention-defaults.md) | Retention defaults and the 24-hour gate | Proposed | FR-19, FR-30; #27 | Proposed replacement of ADR-0003 |
 
+| [ADR-0009](0009-resume-knowledge-base.md) | Resume knowledge bases as relevance evidence | Proposed | FR-25; P1-004; #19 | — |
+
 ## Minimal operating rules
 
 1. **Trigger / pause:** When the agent lacks confidence or cannot determine a consequential next step from approved requirements and evidence, **stop affected work and ask the human**. Record the question and `blocked` state on the Issue. When the answer produces a new requirement/design/implementation decision, an ADR and Issue backlink are mandatory. Ordinary clear, reversible local fixes do not need an ADR.
