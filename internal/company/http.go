@@ -254,7 +254,7 @@ func respond(w http.ResponseWriter, value any, err error, success int) {
 			http.Error(w, "not found", http.StatusNotFound)
 		case errors.As(err, &pgerr) && (pgerr.Code == "23505" || pgerr.Code == "23503"):
 			http.Error(w, "registry conflict", http.StatusConflict)
-		case errors.Is(err, policy.ErrCapabilityDenied), errors.Is(err, policy.ErrSourceUnregistered):
+		case errors.Is(err, policy.ErrCapabilityDenied), errors.Is(err, policy.ErrSourceUnregistered), errors.Is(err, policy.ErrGlobalStopped):
 			http.Error(w, "source policy denies validation", http.StatusForbidden)
 		case errors.Is(err, ErrInvalidInput):
 			http.Error(w, "invalid request", http.StatusBadRequest)

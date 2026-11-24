@@ -154,6 +154,14 @@ func (i *Inspector) Discover(ctx context.Context, seedID int64) ([]Candidate, er
 	if err != nil {
 		return nil, err
 	}
+	if err := policy.CheckGlobal(ctx, i.DB); err != nil {
+		if errors.Is(err, policy.ErrGlobalStopped) {
+			if queueErr := i.queueException(ctx, seed, "global_policy_blocked"); queueErr != nil {
+				return nil, queueErr
+			}
+		}
+		return nil, err
+	}
 	target, err := url.Parse(seed.URL)
 	if err != nil || target.Scheme != "https" || target.Hostname() == "" || target.User != nil {
 		return nil, errors.New("seed must be an HTTPS URL")

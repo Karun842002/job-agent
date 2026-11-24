@@ -28,7 +28,22 @@ func TestProviderValidationIntegration(t *testing.T) {
 	}
 	defer db.Close()
 	ctx := context.Background()
-	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	version := time.Now().UnixNano()
+	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", version); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, err := sql.Open("pgx", databaseURL)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer cleanup.Close()
+		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM policy_versions WHERE version=$1", version); err != nil {
+			t.Error(err)
+		}
+	})
+	suffix := fmt.Sprintf("%d", version)
 	store := Store{DB: db}
 	company, err := store.CreateCompany(ctx, Company{Name: "Validator fixture", Domain: "validator-" + suffix + ".example"})
 	if err != nil {
@@ -65,6 +80,23 @@ func TestProviderValidationIntegration(t *testing.T) {
 	}
 	ashby, err := store.CreateBoard(ctx, Board{CompanyID: company.ID, Provider: "ashby", Key: "fixture-" + suffix})
 	if err != nil {
+		t.Fatal(err)
+	}
+	const stoppedVersion int64 = 9223372036854775807
+	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,false)", stoppedVersion); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, err := sql.Open("pgx", databaseURL)
+		if err == nil {
+			defer cleanup.Close()
+			_, _ = cleanup.ExecContext(context.Background(), "DELETE FROM policy_versions WHERE version=$1", stoppedVersion)
+		}
+	})
+	if _, err := NewValidator(db).Validate(ctx, greenhouse.ID); !errors.Is(err, policy.ErrGlobalStopped) {
+		t.Fatalf("global stop was bypassed: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "DELETE FROM policy_versions WHERE version=$1", stoppedVersion); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := NewValidator(db).Validate(ctx, greenhouse.ID); !errors.Is(err, policy.ErrSourceUnregistered) {

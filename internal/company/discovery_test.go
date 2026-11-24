@@ -46,7 +46,22 @@ func TestDiscoveryIntegration(t *testing.T) {
 	}
 	defer db.Close()
 	ctx := context.Background()
-	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	version := time.Now().UnixNano()
+	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", version); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, err := sql.Open("pgx", databaseURL)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer cleanup.Close()
+		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM policy_versions WHERE version=$1", version); err != nil {
+			t.Error(err)
+		}
+	})
+	suffix := fmt.Sprintf("%d", version)
 	host := "careers-" + suffix + ".example"
 	store := Store{DB: db}
 	company, err := store.CreateCompany(ctx, Company{Name: "Discovery fixture", Domain: "company-" + suffix + ".example"})

@@ -90,6 +90,14 @@ func (v *Validator) Validate(ctx context.Context, id int64) (ValidationResult, e
 		}
 		return ValidationResult{}, errors.New("unsupported board provider")
 	}
+	if err := policy.CheckGlobal(ctx, v.DB); err != nil {
+		if errors.Is(err, policy.ErrGlobalStopped) {
+			if updateErr := v.setResult(ctx, board, "blocked_by_policy", nil); updateErr != nil {
+				return ValidationResult{}, updateErr
+			}
+		}
+		return ValidationResult{}, err
+	}
 	boardScope := "board:" + board.Provider + ":" + board.Key
 	authorize := func(ctx context.Context, requestHost string) error {
 		if err := policy.CheckSource(ctx, v.DB, boardScope, policy.Discovery); err != nil {

@@ -1,6 +1,6 @@
 # Board validation
 
-The validator supports Greenhouse and Ashby public job-board endpoints. Register reviewed discovery policies for both the provider hostname and the exact board scope, formatted as board:provider:board_key, before validating. A missing or denied policy blocks the request. The API endpoint is `POST /api/v1/boards/{id}/validate` and requires the configured bearer token.
+The validator supports Greenhouse and Ashby public job-board endpoints. Register reviewed discovery policies for both the provider hostname and the exact board scope, formatted as board:provider:board_key, before validating. A missing or denied policy or disabled global policy blocks the request. The API endpoint is `POST /api/v1/boards/{id}/validate` and requires the configured bearer token.
 
 Greenhouse board metadata confirms the board is reachable. It does not report listing counts. Ashby responses distinguish listed, unlisted and unknown listings. These counts are observations from the returned response and do not establish complete company coverage. Unavailable, malformed and rate-limited responses leave the board degraded. Permission denials and provider access blocks leave it policy-blocked.
 
