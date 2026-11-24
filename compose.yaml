@@ -29,7 +29,9 @@ services:
     ports:
       - "127.0.0.1:16686:16686"
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.117.0
+    build:
+      context: .
+      dockerfile: deploy/otel/Dockerfile
     profiles: ["observability"]
     command: ["--config=/etc/otelcol-contrib/collector.yaml"]
     environment:
