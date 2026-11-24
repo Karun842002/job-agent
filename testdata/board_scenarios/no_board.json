@@ -1,0 +1,8 @@
+{
+  "id": "no-board",
+  "name": "No ATS reference",
+  "page_html": "<html><body><h1>Careers</h1><p>Open roles are listed here.</p></body></html>",
+  "expected_candidates": 0,
+  "expected_boards": 0,
+  "existing_boards": []
+}

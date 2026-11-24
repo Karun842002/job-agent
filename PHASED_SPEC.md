@@ -409,7 +409,7 @@ Not every job progresses through all states. Allow closure/expiration/rejection 
 | FR-27 | Browser fallback for dynamic discovery, job details and permitted form tasks | Mock harness + local dynamic pages |
 | FR-28 | Enforce capability gating separately for browser `READ`, `FILL`, `UPLOAD`, `SUBMIT` | Denial and policy escalation tests |
 | FR-29 | Emit step-level JSON events and join Temporal, browser and application traces | End-to-end correlation tests |
-| FR-30 | Export redacted GenAI OTel traces to Langfuse and record cost/tokens/evaluations | Local OTLP capture test + Langfuse smoke check |
+| FR-30 | Export redacted GenAI OTel traces and record cost/tokens/evaluations; remote export is disabled pending a verified compliant backend (ADR-0007) | Local OTLP capture test; remote smoke check after the gate is lifted |
 | FR-31 | User can inspect step history and policy decisions per job/application | Timeline UI and pagination tests |
 | FR-32 | Version policy changes and pause at safe boundaries after disabling a tier | In-flight workflow / policy-change tests |
 | FR-33 | Execute company/ATS discovery and board polling as scheduled one-shot Go commands under crontab | Cron command integration tests; verify no model/agent/browser endpoints called |
@@ -449,7 +449,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 - [ ] **[P0-003]** Docker Compose for PostgreSQL (Temporal optional until Phase 3); versioned SQL migrations.
 - [ ] **[P0-004]** Cron runtime documentation and Linux/WSL crontab template; compile deterministic `discover-companies`, `poll-boards` and `discovery-monitor` Go CLIs.
 - [ ] **[P0-009]** Structured JSON logs, W3C trace propagation, high-cardinality-safe metrics and immutable audit-event contract (§12).
-- [ ] **[P0-010]** OpenTelemetry Collector / local observability stack; configure trace export to operations backend and **redacted GenAI OTLP/HTTP export to Langfuse**.
+- [ ] **[P0-010]** OpenTelemetry Collector / local observability stack; configure trace export to operations backend and redacted GenAI OTLP/HTTP export. Remote export remains disabled until a compliant backend is selected and verified (ADR-0007); synthetic local mock validation remains available.
 - [ ] **[P0-011]** Tier tables and `StepMode` evaluator (`LIVE`/`AUDIT`/`OFF`), policy-version snapshots, global emergency stop and permission precedence.
 - [ ] **[P0-012]** `BrowserTaskRunner` Go interface and stub harness adapter; durable broker/task schema and mock browser transport.
 - [ ] **[P0-013]** Audit preview data model and invariant tests forbidding remote writes and production-domain mutations in `AUDIT`.
@@ -474,7 +474,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 - [ ] **[P1-001]** CRUD for companies/seeds and boards; import from CSV/YAML.
 - [ ] **[P1-002]** Safe, deterministic careers-site HTML inspector for ATS URLs; on JS-only or blocked sites enqueue a **separate** browser exception for human/agent triage, never invoke the browser inside the cron process; manual board registration if blocked.
 - [ ] **[P1-003]** Editable, enabled/disabled company tiers and role tiers; explicit `UNASSIGNED` defaults; tier assignment and version history.
-- [ ] **[P1-004]** Deterministic rule-based relevance detector and deduplicated tier inbox for newly discovered companies/role categories. LLM-enhanced explanations, if enabled later, must be a separate queued downstream step.
+- [ ] **[P1-004]** Deterministic rule-based relevance detector and deduplicated tier inbox for newly discovered companies/role categories. Qualification requires eligible geography, career evidence, reliable source, and a title or skills match (ADR-0006). LLM-enhanced explanations, if enabled later, must be a separate queued downstream step.
 - [ ] **[P1-005]** Harness broker test for permitted `NAVIGATE`/`READ` with origin/action allowlisting and redacted evidence.
 - [ ] **[P1-006]** Greenhouse board validator; Ashby board validator; listed/unlisted distinction.
 - [ ] **[P1-007]** Board state, capabilities, provenance, last-verified timestamp, operator overrides.
@@ -656,7 +656,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 
 ## 8. API surface (initial)
 
-Use versioned JSON endpoints, typed request/response schemas and OpenAPI. All mutating endpoints require authentication, CSRF protection as applicable, and audit events.
+Use versioned JSON endpoints, typed request/response schemas and OpenAPI. All mutating endpoints require authentication, CSRF protection as applicable, and audit events. The single-user API uses a server-configured bearer token in the Authorization header, with loopback binding by default. See [ADR-0004](docs/adr/0004-api-authentication.md).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -787,7 +787,7 @@ Example event (values illustrative):
 
 - Instrument HTTP server/client, provider adapters, Temporal dispatch/Activities, DB, LLM gateway, document renderer, browser broker, policy resolver and notification dispatcher. Propagate W3C trace context (`traceparent`/`tracestate`) and stable business correlation IDs across broker callbacks; do not use dynamic company/job IDs as metric labels.
 - Recommended pipeline: Go OpenTelemetry SDK → OpenTelemetry Collector with redaction/filtering/queue/retry → operational traces (Tempo/Jaeger), metrics (Prometheus-compatible/Grafana), logs (Loki or other log backend). **Use a dedicated filtered OTLP/HTTP traces exporter to Langfuse for GenAI spans**, so operational traces and LLM telemetry can be correlated but do not inadvertently copy all personal information.
-- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts.
+- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts. Remote telemetry export is disabled pending selection and verification of a backend that satisfies the 24-hour deletion policy (ADR-0007); synthetic local mock validation remains available.
 - Set role-based access controls and retention for logs, traces, images and audit events. Redact tokens, cookies, browser profiles, emails, CV details, full prompt content and form values by default.
 
 ### 12.3 Langfuse LLM observability (required)
@@ -967,7 +967,7 @@ A phase is **done** only when implementation, tests, docs, observability, rollba
 7. **Work authorisation / compensation:** user-entered verified preferences, not inference.
 8. **Board-coverage metrics:** report observed boards, not the false promise of universal employer coverage.
 9. **Submission API:** expect manual-only in most cases; employer-level credentials must be verified before implementation.
-10. **Retention:** choose operational and privacy retention windows before real candidate data is ingested.
+10. **Retention:** automatically delete personal data, diagnostic logs and traces, and audit events 24 hours after creation, including copies. Enforce and verify this policy before ingesting real candidate data. See [ADR-0003](docs/adr/0003-24-hour-retention.md).
 11. **Harness connection:** the agent runtime supports a system browser but its exact invocation/callback interface is deployment-specific; keep a mockable adapter and do not invent an SDK.
 12. **Tier defaults:** company and role tiers are user-defined; examples in §13 are illustrative and disabled/unassigned states must fail closed.
 13. **Dry run:** always simulate externally visible writes; some browser forms autosave and cannot safely be filled in production audit mode.

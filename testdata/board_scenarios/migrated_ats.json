@@ -1,0 +1,10 @@
+{
+  "id": "migrated-ats",
+  "name": "Migrated ATS company",
+  "page_html": "<html><body><a href=\"https://jobs.ashbyhq.com/current-{{suffix}}\">Current roles</a></body></html>",
+  "expected_candidates": 1,
+  "expected_boards": 2,
+  "existing_boards": [
+    {"provider": "greenhouse", "key": "legacy-{{suffix}}", "state": "inactive", "validate": false}
+  ]
+}
