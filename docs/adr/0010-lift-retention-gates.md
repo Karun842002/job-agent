@@ -8,7 +8,7 @@
 - **Issue ADR backlink:** Issue #27 decisions section
 - **Work status:** Unblocked following acceptance and issue reconciliation
 - **Affected specification:** FR-19, FR-30, P0-010, §12, §15.10
-- **Supersedes:** Proposed replacement of the retention-based remote export and candidate-data gates in ADR-0007; ADR-0008 continues to govern documented retention defaults.
+- **Supersedes:** The retention-based remote export and candidate-data gates in ADR-0007; ADR-0008 continues to govern documented retention defaults.
 
 ## Context / problem
 
