@@ -20,6 +20,8 @@ may be indefinite and must not be represented as a deletion deadline.
 [ADR-0008](adr/0008-retention-defaults.md) supersedes the strict 24-hour policy
 in ADR-0003. The separate remote export and real candidate ingestion gates in
 ADR-0007 remain pending explicit reconciliation.
+The [local retention inventory](RETENTION.md) records current known defaults
+and gaps; it does not claim an automatic deletion deadline.
 
 ## Threat model
 
