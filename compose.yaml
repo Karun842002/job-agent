@@ -23,5 +23,26 @@ services:
     volumes:
       - ./migrations:/migrations:ro
     entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://jobagent:jobagent-local@postgres:5432/jobagent?sslmode=disable"]
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    profiles: ["observability"]
+    ports:
+      - "127.0.0.1:16686:16686"
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.117.0
+    profiles: ["observability"]
+    command: ["--config=/etc/otelcol-contrib/collector.yaml"]
+    environment:
+      LANGFUSE_OTLP_ENDPOINT: ${LANGFUSE_OTLP_ENDPOINT:-http://host.docker.internal:4319/v1/traces}
+      LANGFUSE_OTLP_AUTHORIZATION: ${LANGFUSE_OTLP_AUTHORIZATION:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./deploy/otel/collector.yaml:/etc/otelcol-contrib/collector.yaml:ro
+    depends_on:
+      - jaeger
 volumes:
   postgres-data:

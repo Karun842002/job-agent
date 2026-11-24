@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Vet
+        run: go vet ./...
+      - name: Unit tests
+        run: go test ./...
+      - name: Race tests
+        run: go test -race ./...
+      - name: Vulnerability scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          govulncheck ./...
+
+  postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Start PostgreSQL and migrate
+        run: |
+          docker compose up -d postgres
+          docker compose --profile tools run --rm migrate up
+      - name: PostgreSQL integration tests
+        env:
+          TEST_DATABASE_URL: postgres://jobagent:jobagent-local@127.0.0.1:5432/jobagent?sslmode=disable
+        run: go test -count=1 -race ./...
+      - name: Validate migration rollback and reapply
+        run: |
+          docker compose --profile tools run --rm migrate down 1
+          docker compose --profile tools run --rm migrate up
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
+
+  collector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Start local trace stack
+        run: docker compose --profile observability up -d jaeger otel-collector
+      - name: Verify redacted collector export
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -s -o /dev/null http://127.0.0.1:4318/; then break; fi
+            sleep 1
+          done
+          curl -s -o /dev/null http://127.0.0.1:4318/
+          gateway=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
+          TEST_OTEL_MOCK_LISTEN="${gateway}:4319" TEST_OTEL_COLLECTOR="http://127.0.0.1:4318/v1/traces" go test -count=1 -run TestCollectorRedactsGeneration ./internal/platform/langfuse
+      - name: Stop services
+        if: always()
+        run: docker compose --profile observability down

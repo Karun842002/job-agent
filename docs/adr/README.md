@@ -9,6 +9,10 @@ This file is the **index**, not another requirements specification. Each accepte
 | [ADR-0001](0001-deterministic-cron-discovery.md) | Deterministic cron discovery with zero LLM calls | Accepted (existing product direction) | §1, §2, §7, §9; future implementation Issues | — |
 | [ADR-0002](0002-pause-for-clarification-and-link-decisions.md) | Pause on low-confidence decisions; append ADRs and backlink Issues | Accepted (human instruction) | Development workflow; future GitHub Issues | — |
 
+| [ADR-0003](0003-24-hour-retention.md) | Delete personal, diagnostic and audit data 24 hours after creation | Accepted (owner instruction) | §10, §12, §15.10; FR-19; #11 | — |
+
+| [ADR-0004](0004-api-authentication.md) | Server-configured bearer token for the API | Accepted (owner instruction) | §8; FR-01; #16 | — |
+
 ## Minimal operating rules
 
 1. **Trigger / pause:** When the agent lacks confidence or cannot determine a consequential next step from approved requirements and evidence, **stop affected work and ask the human**. Record the question and `blocked` state on the Issue. When the answer produces a new requirement/design/implementation decision, an ADR and Issue backlink are mandatory. Ordinary clear, reversible local fixes do not need an ADR.
