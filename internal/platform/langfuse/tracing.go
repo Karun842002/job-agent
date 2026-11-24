@@ -4,6 +4,8 @@ package langfuse
 import (
 	"context"
 	"errors"
+	"net/netip"
+	"net/url"
 	"regexp"
 	"time"
 
@@ -18,6 +20,14 @@ var modelName = regexp.MustCompile(`^[A-Za-z0-9_./:-]{1,128}$`)
 
 // NewProvider sends spans to an OTLP/HTTP endpoint with a bounded queue.
 func NewProvider(ctx context.Context, endpoint string) (*sdktrace.TracerProvider, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme != "http" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "/v1/traces" {
+		return nil, errors.New("telemetry endpoint must be a local collector")
+	}
+	ip, err := netip.ParseAddr(u.Hostname())
+	if err != nil || !ip.IsLoopback() {
+		return nil, errors.New("telemetry endpoint must be a local collector")
+	}
 	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint), otlptracehttp.WithTimeout(3*time.Second))
 	if err != nil {
 		return nil, err
