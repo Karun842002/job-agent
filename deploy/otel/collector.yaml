@@ -65,9 +65,8 @@ exporters:
     tls:
       insecure: true
   otlphttp/langfuse:
-    traces_endpoint: ${env:LANGFUSE_OTLP_ENDPOINT}
-    headers:
-      Authorization: ${env:LANGFUSE_OTLP_AUTHORIZATION}
+    # Synthetic local capture only; remote export remains gated by ADR-0007.
+    traces_endpoint: http://host.docker.internal:4319/v1/traces
 
 service:
   pipelines:
