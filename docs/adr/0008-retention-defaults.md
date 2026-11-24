@@ -53,3 +53,5 @@ Existing data and copies can remain longer than 24 hours; restoration may reintr
 ## Chronological addenda
 
 2026-11-24: The owner responded “Acceept both ADRs” to the explicit request to accept ADR-0008 and ADR-0009 and reconcile affected criteria. The strict 24-hour requirement is superseded as stated above. The owner did not select an option concerning the separate remote-export and candidate-data gates, which remain pending.
+
+2026-11-24: The owner subsequently selected “Lift both gates using documented defaults” and explicitly accepted ADR-0010 and the associated issue changes. ADR-0010 supersedes the retention-based portions of ADR-0007; other privacy and authorization controls continue to apply.

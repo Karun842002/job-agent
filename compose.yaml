@@ -32,6 +32,9 @@ services:
     image: otel/opentelemetry-collector-contrib:0.117.0
     profiles: ["observability"]
     command: ["--config=/etc/otelcol-contrib/collector.yaml"]
+    environment:
+      LANGFUSE_OTLP_ENDPOINT: ${LANGFUSE_OTLP_ENDPOINT:-http://host.docker.internal:4319/v1/traces}
+      LANGFUSE_OTLP_AUTHORIZATION: ${LANGFUSE_OTLP_AUTHORIZATION:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

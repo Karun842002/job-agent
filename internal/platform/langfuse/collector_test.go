@@ -33,6 +33,11 @@ func TestCollectorRedactsGeneration(t *testing.T) {
 	}
 	bodies := make(chan []byte, 4)
 	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if expected := os.Getenv("TEST_OTEL_MOCK_PATH"); expected != "" && r.URL.Path != expected {
+			t.Errorf("collector exported to path %q, want %q", r.URL.Path, expected)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		var input io.Reader = r.Body
 		if r.Header.Get("Content-Encoding") == "gzip" {
 			reader, err := gzip.NewReader(r.Body)

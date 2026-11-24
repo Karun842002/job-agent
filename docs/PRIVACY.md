@@ -18,8 +18,8 @@ logs, traces, prompts, browser evidence or workflow history.
 Document retention of backups and exports as well as primary stores. Tool defaults
 may be indefinite and must not be represented as a deletion deadline.
 [ADR-0008](adr/0008-retention-defaults.md) supersedes the strict 24-hour policy
-in ADR-0003. The separate remote export and real candidate ingestion gates in
-ADR-0007 remain pending explicit reconciliation.
+in ADR-0003. ADR-0010 lifts ADR-0007’s retention-based remote export and candidate
+ingestion gates. Existing access, redaction and authorization controls remain.
 The [local retention inventory](RETENTION.md) records current known defaults
 and gaps; it does not claim an automatic deletion deadline.
 
