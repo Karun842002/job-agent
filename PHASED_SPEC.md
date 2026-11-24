@@ -787,7 +787,7 @@ Example event (values illustrative):
 
 - Instrument HTTP server/client, provider adapters, Temporal dispatch/Activities, DB, LLM gateway, document renderer, browser broker, policy resolver and notification dispatcher. Propagate W3C trace context (`traceparent`/`tracestate`) and stable business correlation IDs across broker callbacks; do not use dynamic company/job IDs as metric labels.
 - Recommended pipeline: Go OpenTelemetry SDK → OpenTelemetry Collector with redaction/filtering/queue/retry → operational traces (Tempo/Jaeger), metrics (Prometheus-compatible/Grafana), logs (Loki or other log backend). **Use a dedicated filtered OTLP/HTTP traces exporter to Langfuse for GenAI spans**, so operational traces and LLM telemetry can be correlated but do not inadvertently copy all personal information.
-- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts. Remote telemetry export is disabled pending selection and verification of a backend that satisfies the 24-hour deletion policy (ADR-0007); synthetic local mock validation remains available.
+- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts. Remote telemetry export remains disabled under ADR-0007 pending explicit reconciliation; synthetic local mock validation remains available. The strict 24-hour deadline has been superseded by ADR-0008.
 - Set role-based access controls and retention for logs, traces, images and audit events. Redact tokens, cookies, browser profiles, emails, CV details, full prompt content and form values by default.
 
 ### 12.3 Langfuse LLM observability (required)
@@ -967,7 +967,7 @@ A phase is **done** only when implementation, tests, docs, observability, rollba
 7. **Work authorisation / compensation:** user-entered verified preferences, not inference.
 8. **Board-coverage metrics:** report observed boards, not the false promise of universal employer coverage.
 9. **Submission API:** expect manual-only in most cases; employer-level credentials must be verified before implementation.
-10. **Retention:** automatically delete personal data, diagnostic logs and traces, and audit events 24 hours after creation, including copies. Enforce and verify this policy before ingesting real candidate data. See [ADR-0003](docs/adr/0003-24-hour-retention.md).
+10. **Retention:** document actual configured retention and tool defaults for personal data, diagnostic logs, traces, audit events and copies; use tool defaults where configuration is unavailable. Defaults may retain data indefinitely and must not be represented as a deletion guarantee. ADR-0008 supersedes ADR-0003’s strict 24-hour deadline. The separately recorded remote export and real candidate ingestion gates remain pending explicit reconciliation (ADR-0007).
 11. **Harness connection:** the agent runtime supports a system browser but its exact invocation/callback interface is deployment-specific; keep a mockable adapter and do not invent an SDK.
 12. **Tier defaults:** company and role tiers are user-defined; examples in §13 are illustrative and disabled/unassigned states must fail closed.
 13. **Dry run:** always simulate externally visible writes; some browser forms autosave and cannot safely be filled in production audit mode.
