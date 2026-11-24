@@ -1,0 +1,7 @@
+*
+!deploy/
+deploy/*
+!deploy/otel/
+deploy/otel/*
+!deploy/otel/Dockerfile
+!deploy/otel/entrypoint.sh
