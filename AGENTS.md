@@ -17,7 +17,7 @@ Read only the relevant spec sections, accepted ADRs, issue and impacted source f
 2. Score the Issue against the rubric in `docs/DEVELOPMENT_WORKFLOW.md`. Revise and rescore at most **three** rounds. Do not invent missing requirements. **Human approval** of the final Issue is required before implementation. Any unclear or low-confidence decision triggers the pause-and-ask rule in §2; scoring never permits guessing.
 3. Work on an issue-specific branch. Implement the approved scope with tests and coherent, single-responsibility commits. Raise unrelated work as linked follow-up Issues.
 4. Independently verify the diff and tests against **every approved acceptance criterion**. Record `PASS`, `FAIL` or `UNKNOWN` with evidence; score code quality, fix findings and re-verify at most **three** rounds. Hard blockers cannot be outweighed by scores.
-5. Open a structured PR only after verification passes. The agent may push and open the PR but **MUST NOT approve, enable auto-merge, bypass checks or merge**. A human reviews, approves and merges.
+5. Open a structured PR only after verification passes. The agent may push and open the PR but **MUST NOT approve, enable auto-merge, bypass checks or merge**. The human reviews and manually merges the PR. A separate GitHub approval is not required.
 6. On resumption, re-read the latest approved Issue, approved ADRs, branch diff, comments and tests. Neither a conversation summary nor an agent's earlier self-assessment is authoritative.
 
 Do not introduce a separate task database, PA agents, agent coordinator, leases or custom Codex hooks for this review process. GitHub Issues, PRs and Git history are the durable development records.

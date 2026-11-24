@@ -26,10 +26,26 @@ var (
 // CheckSource verifies the requested capability against the stored policy.
 // Missing policies, denied actions, and storage failures all stop the action.
 func CheckSource(ctx context.Context, db *sql.DB, source string, capability Capability) error {
+	return checkSource(ctx, db, source, capability, false)
+}
+
+// CheckSourceTx checks and locks a source policy until the transaction ends.
+func CheckSourceTx(ctx context.Context, tx *sql.Tx, source string, capability Capability) error {
+	return checkSource(ctx, tx, source, capability, true)
+}
+
+type sourceQuerier interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func checkSource(ctx context.Context, db sourceQuerier, source string, capability Capability, lock bool) error {
 	var discovery, poll, apiSubmit, browserSubmit bool
-	err := db.QueryRowContext(ctx, `SELECT discovery_allowed, poll_allowed,
-		api_submit_allowed, browser_submit_allowed FROM source_policies WHERE source = $1`,
-		source).Scan(&discovery, &poll, &apiSubmit, &browserSubmit)
+	query := `SELECT discovery_allowed, poll_allowed,
+		api_submit_allowed, browser_submit_allowed FROM source_policies WHERE source = $1`
+	if lock {
+		query += " FOR SHARE"
+	}
+	err := db.QueryRowContext(ctx, query, source).Scan(&discovery, &poll, &apiSubmit, &browserSubmit)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("%w: register and review the source before use", ErrSourceUnregistered)
 	}

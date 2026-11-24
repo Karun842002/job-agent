@@ -12,6 +12,9 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"karun.tech/jobagent/internal/policy"
+	"karun.tech/jobagent/internal/tiers"
 )
 
 // Handler exposes registry operations using a server-configured bearer token.
@@ -46,6 +49,10 @@ func Handler(store Store, token string) http.Handler {
 		if !decode(w, r, &value) {
 			return
 		}
+		if value.TierID != "" {
+			http.Error(w, "assign tiers through the dedicated endpoint", http.StatusBadRequest)
+			return
+		}
 		value.ID = 0
 		result, err := store.CreateCompany(r.Context(), value)
 		respond(w, result, err, http.StatusCreated)
@@ -65,6 +72,10 @@ func Handler(store Store, token string) http.Handler {
 		}
 		var value Company
 		if !decode(w, r, &value) {
+			return
+		}
+		if value.TierID != "" {
+			http.Error(w, "assign tiers through the dedicated endpoint", http.StatusBadRequest)
 			return
 		}
 		value.ID = id
@@ -118,6 +129,10 @@ func Handler(store Store, token string) http.Handler {
 		if !decode(w, r, &value) {
 			return
 		}
+		if !emptyMetadata(value.Metadata) {
+			http.Error(w, "set metadata through its dedicated endpoint", http.StatusBadRequest)
+			return
+		}
 		value.ID = 0
 		result, err := store.CreateBoard(r.Context(), value)
 		respond(w, result, err, http.StatusCreated)
@@ -139,8 +154,31 @@ func Handler(store Store, token string) http.Handler {
 		if !decode(w, r, &value) {
 			return
 		}
+		if !emptyMetadata(value.Metadata) {
+			http.Error(w, "set metadata through its dedicated endpoint", http.StatusBadRequest)
+			return
+		}
 		value.ID = id
 		respond(w, nil, store.UpdateBoard(r.Context(), value), http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /api/v1/boards/{id}/validate", func(w http.ResponseWriter, r *http.Request) {
+		id, ok := requestID(w, r)
+		if !ok {
+			return
+		}
+		result, err := NewValidator(store.DB).Validate(r.Context(), id)
+		respond(w, result, err, http.StatusOK)
+	})
+	mux.HandleFunc("PUT /api/v1/boards/{id}/metadata", func(w http.ResponseWriter, r *http.Request) {
+		id, ok := requestID(w, r)
+		if !ok {
+			return
+		}
+		var value BoardMetadata
+		if !decode(w, r, &value) {
+			return
+		}
+		respond(w, nil, store.SetBoardMetadata(r.Context(), id, value), http.StatusNoContent)
 	})
 	mux.HandleFunc("DELETE /api/v1/boards/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := requestID(w, r)
@@ -154,6 +192,7 @@ func Handler(store Store, token string) http.Handler {
 		count, err := store.Import(r.Context(), format, http.MaxBytesReader(w, r.Body, maxImportBytes+1))
 		respond(w, map[string]int{"imported": count}, err, http.StatusCreated)
 	})
+	tiers.Register(mux, store.DB)
 	expected := sha256.Sum256([]byte(token))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if token == "" {
@@ -174,6 +213,11 @@ func Handler(store Store, token string) http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+func emptyMetadata(value BoardMetadata) bool {
+	return value.State == "" && len(value.Capabilities) == 0 && len(value.Provenance) == 0 &&
+		value.LastVerifiedAt == nil && len(value.OperatorOverride) == 0
 }
 
 func decode(w http.ResponseWriter, r *http.Request, value any) bool {
@@ -220,6 +264,8 @@ func respond(w http.ResponseWriter, value any, err error, success int) {
 			http.Error(w, "not found", http.StatusNotFound)
 		case errors.As(err, &pgerr) && (pgerr.Code == "23505" || pgerr.Code == "23503"):
 			http.Error(w, "registry conflict", http.StatusConflict)
+		case errors.Is(err, policy.ErrCapabilityDenied), errors.Is(err, policy.ErrSourceUnregistered), errors.Is(err, policy.ErrGlobalStopped), errors.Is(err, policy.ErrIntakeDenied):
+			http.Error(w, "source policy denies validation", http.StatusForbidden)
 		case errors.Is(err, ErrInvalidInput):
 			http.Error(w, "invalid request", http.StatusBadRequest)
 		default:

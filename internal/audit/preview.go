@@ -18,12 +18,29 @@ type Preview struct {
 // SavePreview only persists a hypothetical diff for an AUDIT policy snapshot.
 // It does not accept a browser, network client, or domain-state writer.
 func SavePreview(ctx context.Context, db *sql.DB, preview Preview) (int64, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	id, err := SavePreviewTx(ctx, tx, preview)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// SavePreviewTx stores a hypothetical diff using the caller's transaction.
+func SavePreviewTx(ctx context.Context, tx *sql.Tx, preview Preview) (int64, error) {
 	if preview.PolicySnapshotID <= 0 || !metadataToken.MatchString(preview.StepRunID) ||
 		len(preview.Diff) == 0 || len(preview.Diff) > 65536 || !json.Valid(preview.Diff) {
 		return 0, errors.New("invalid audit preview")
 	}
 	var id int64
-	err := db.QueryRowContext(ctx, `INSERT INTO audit_previews
+	err := tx.QueryRowContext(ctx, `INSERT INTO audit_previews
 		(policy_snapshot_id, step_run_id, diff)
 		SELECT id, $2, $3 FROM effective_step_policies
 		WHERE id = $1 AND mode = 'AUDIT'

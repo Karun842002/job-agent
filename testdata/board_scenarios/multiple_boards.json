@@ -1,0 +1,8 @@
+{
+  "id": "multiple-boards",
+  "name": "Multiple ATS boards",
+  "page_html": "<html><body><a href=\"https://boards.greenhouse.io/greenhouse-{{suffix}}\">Engineering</a><a href=\"https://jobs.ashbyhq.com/ashby-{{suffix}}\">Research</a></body></html>",
+  "expected_candidates": 2,
+  "expected_boards": 2,
+  "existing_boards": []
+}

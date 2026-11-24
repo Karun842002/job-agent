@@ -1,0 +1,10 @@
+{
+  "id": "inaccessible-board",
+  "name": "Inaccessible board",
+  "page_html": "<html><body><p>Career link withheld</p></body></html>",
+  "expected_candidates": 0,
+  "expected_boards": 1,
+  "existing_boards": [
+    {"provider": "greenhouse", "key": "blocked-{{suffix}}", "state": "candidate", "validate": true, "response_status": 403}
+  ]
+}

@@ -21,6 +21,7 @@ const (
 type Axis struct {
 	TierID  string
 	Enabled bool
+	Version int64
 	Mode    Mode
 }
 
@@ -125,4 +126,20 @@ func RecordStep(ctx context.Context, tx *sql.Tx, input StepInput) (int64, Decisi
 		return 0, Decision{}, fmt.Errorf("persist policy snapshot: %w", err)
 	}
 	return id, decision, nil
+}
+
+// ErrGlobalStopped indicates that no enabled global policy is available.
+var ErrGlobalStopped = errors.New("global policy is disabled or unavailable")
+
+// CheckGlobal fails closed when the latest policy is absent or stopped.
+func CheckGlobal(ctx context.Context, db *sql.DB) error {
+	var enabled bool
+	err := db.QueryRowContext(ctx, "SELECT global_enabled FROM policy_versions ORDER BY version DESC LIMIT 1").Scan(&enabled)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !enabled) {
+		return ErrGlobalStopped
+	}
+	if err != nil {
+		return fmt.Errorf("read global policy: %w", err)
+	}
+	return nil
 }
