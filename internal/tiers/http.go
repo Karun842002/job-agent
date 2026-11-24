@@ -63,6 +63,19 @@ func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 // Register adds tier routes to a mux protected by the API authentication layer.
 func Register(mux *http.ServeMux, db *sql.DB) {
 	store := Store{DB: db}
+	mux.HandleFunc("GET /api/v1/tier-proposals", func(w http.ResponseWriter, r *http.Request) {
+		after := int64(0)
+		if raw := r.URL.Query().Get("after"); raw != "" {
+			var err error
+			after, err = strconv.ParseInt(raw, 10, 64)
+			if err != nil || after < 0 {
+				reply(w, nil, ErrInvalid, 0)
+				return
+			}
+		}
+		values, err := store.ListProposals(r.Context(), after)
+		reply(w, values, err, http.StatusOK)
+	})
 	for _, item := range []struct{ path, axis string }{{"companies", "company"}, {"roles", "role"}} {
 		item := item
 		mux.HandleFunc("GET /api/v1/tiers/"+item.path, func(w http.ResponseWriter, r *http.Request) {
