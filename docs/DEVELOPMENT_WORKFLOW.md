@@ -80,6 +80,7 @@ After each fix, rerun relevant tests and the review. Stop after three unsuccessf
 - Do not amend/rebase/force-push shared history without authorisation.
 - Open the PR **after** verifying all acceptance criteria. Check that each confirmed consequential decision is recorded in a linked, accepted ADR and cross-referenced in the Issue. Use `.github/pull_request_template.md`, link Issue and ADRs, include criterion-by-criterion evidence, commands and actual outcomes, risks/rollback, and follow-ups.
 - The agent must **never** approve or merge its PR, enable auto-merge or bypass branch protections. The human reviews and manually merges the PR. A separate GitHub approval is not required.
+- For a stack that introduces CI, keep pull-request protection active from the start. Add required check contexts as soon as the workflow is on `main`, before merging later PRs; checks unavailable on `main` cannot validate earlier stack merges.
 - Consider the Issue delivered only after the PR is merged. Deferred scope remains a separately linked open Issue.
 
 ## 6. Completion and migration checks
