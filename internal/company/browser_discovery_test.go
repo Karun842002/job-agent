@@ -76,6 +76,7 @@ func TestMockHarnessDiscoversAndValidatesDynamicBoard(t *testing.T) {
 	}
 	suffix := fmt.Sprintf("%d", version)
 	source := "dynamic-careers-" + suffix + ".example"
+	workflowID := "dynamic-fixture-" + suffix
 	company, err := (Store{DB: db}).CreateCompany(ctx, Company{Name: "Dynamic page fixture", Domain: "dynamic-company-" + suffix + ".example"})
 	if err != nil {
 		t.Fatal(err)
@@ -113,7 +114,9 @@ func TestMockHarnessDiscoversAndValidatesDynamicBoard(t *testing.T) {
 			return
 		}
 		defer cleanup.Close()
-		_, _ = cleanup.ExecContext(context.Background(), "DELETE FROM browser_tasks WHERE workflow_id='dynamic-fixture'")
+		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM browser_tasks WHERE workflow_id=$1", workflowID); err != nil {
+			t.Error(err)
+		}
 		_, _ = cleanup.ExecContext(context.Background(), "DELETE FROM source_browser_origins WHERE source=$1", source)
 		_, _ = cleanup.ExecContext(context.Background(), "DELETE FROM ats_boards WHERE company_id=$1", company.ID)
 		_, _ = cleanup.ExecContext(context.Background(), "DELETE FROM companies WHERE id=$1", company.ID)
@@ -124,7 +127,7 @@ func TestMockHarnessDiscoversAndValidatesDynamicBoard(t *testing.T) {
 		}
 	})
 	mock := &dynamicPageHarness{server: page, rendered: `<html><body><a href="https://jobs.ashbyhq.com/dynamic-` + suffix + `">Current openings</a></body></html>`}
-	task := browser.BrowserTask{WorkflowID: "dynamic-fixture", StepRunID: "dynamic-read", Source: source,
+	task := browser.BrowserTask{WorkflowID: workflowID, StepRunID: "dynamic-read", Source: source,
 		Origin: origin, AllowedOrigins: []string{origin}, Action: "NAVIGATE", AllowedActions: []string{"NAVIGATE", "READ"},
 		PolicySnapshotID: snapshotID, PolicyVersion: version, Deadline: time.Now().Add(time.Minute), CallbackID: "dynamic-" + suffix}
 	broker := browser.Broker{DB: db}
