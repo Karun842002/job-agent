@@ -15,9 +15,9 @@ This file is the **index**, not another requirements specification. Each accepte
 
 | [ADR-0005](0005-provider-validation-permission.md) | Temporary public provider-board validation | Accepted (owner instruction) | §3.1–3.3; Phase 1 exit; FR-03; #21 | — |
 
-| [ADR-0006](0006-relevance-qualification.md) | Deterministic relevance qualification | Proposed | FR-25; P1-004; #19 | — |
+| [ADR-0006](0006-relevance-qualification.md) | Deterministic relevance qualification | Accepted (owner instruction) | FR-25; P1-004; #19 | — |
 
-| [ADR-0007](0007-remote-telemetry-retention.md) | Gate remote telemetry on retention compliance | Proposed | FR-19, FR-30; P0-010; #27 | — |
+| [ADR-0007](0007-remote-telemetry-retention.md) | Gate remote telemetry on retention compliance | Accepted (owner instruction) | FR-19, FR-30; P0-010; #27 | — |
 
 ## Minimal operating rules
 

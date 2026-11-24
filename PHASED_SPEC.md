@@ -449,7 +449,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 - [ ] **[P0-003]** Docker Compose for PostgreSQL (Temporal optional until Phase 3); versioned SQL migrations.
 - [ ] **[P0-004]** Cron runtime documentation and Linux/WSL crontab template; compile deterministic `discover-companies`, `poll-boards` and `discovery-monitor` Go CLIs.
 - [ ] **[P0-009]** Structured JSON logs, W3C trace propagation, high-cardinality-safe metrics and immutable audit-event contract (§12).
-- [ ] **[P0-010]** OpenTelemetry Collector / local observability stack; configure trace export to operations backend and **redacted GenAI OTLP/HTTP export to Langfuse**.
+- [ ] **[P0-010]** OpenTelemetry Collector / local observability stack; configure trace export to operations backend and redacted GenAI OTLP/HTTP export. Remote export remains disabled until a compliant backend is selected and verified (ADR-0007); synthetic local mock validation remains available.
 - [ ] **[P0-011]** Tier tables and `StepMode` evaluator (`LIVE`/`AUDIT`/`OFF`), policy-version snapshots, global emergency stop and permission precedence.
 - [ ] **[P0-012]** `BrowserTaskRunner` Go interface and stub harness adapter; durable broker/task schema and mock browser transport.
 - [ ] **[P0-013]** Audit preview data model and invariant tests forbidding remote writes and production-domain mutations in `AUDIT`.
@@ -474,7 +474,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 - [ ] **[P1-001]** CRUD for companies/seeds and boards; import from CSV/YAML.
 - [ ] **[P1-002]** Safe, deterministic careers-site HTML inspector for ATS URLs; on JS-only or blocked sites enqueue a **separate** browser exception for human/agent triage, never invoke the browser inside the cron process; manual board registration if blocked.
 - [ ] **[P1-003]** Editable, enabled/disabled company tiers and role tiers; explicit `UNASSIGNED` defaults; tier assignment and version history.
-- [ ] **[P1-004]** Deterministic rule-based relevance detector and deduplicated tier inbox for newly discovered companies/role categories. LLM-enhanced explanations, if enabled later, must be a separate queued downstream step.
+- [ ] **[P1-004]** Deterministic rule-based relevance detector and deduplicated tier inbox for newly discovered companies/role categories. Qualification requires eligible geography, career evidence, reliable source, and a title or skills match (ADR-0006). LLM-enhanced explanations, if enabled later, must be a separate queued downstream step.
 - [ ] **[P1-005]** Harness broker test for permitted `NAVIGATE`/`READ` with origin/action allowlisting and redacted evidence.
 - [ ] **[P1-006]** Greenhouse board validator; Ashby board validator; listed/unlisted distinction.
 - [ ] **[P1-007]** Board state, capabilities, provenance, last-verified timestamp, operator overrides.

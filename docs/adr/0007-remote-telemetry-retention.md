@@ -1,12 +1,12 @@
 # ADR-0007: Gate remote telemetry on retention compliance
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date proposed:** 2026-11-24
-- **Decision owner / approver:** Project owner; acceptance pending
-- **Approval evidence:** Pending
+- **Decision owner / approver:** Project owner
+- **Approval evidence:** Project conversation, 2026-11-24: “Accept both”
 - **Related GitHub Issue:** [#27](https://github.com/Karun842002/job-agent/issues/27)
 - **Issue ADR backlink:** See issue #27 decisions section
-- **Work status while uncertain:** Blocked pending acceptance and issue reconciliation
+- **Work status while uncertain:** Unblocked after issue reconciliation
 - **Affected specification:** FR-19, FR-30, P0-010, §12, §15.10
 - **Supersedes:** None; ADR-0003 retains its 24-hour policy
 
@@ -44,13 +44,13 @@ Remote Langfuse model traces are unavailable while the gate is in place. Keep re
 
 ## Resolution and Issue reconciliation
 
-- **Approved/rejected by:** Pending (human only)
-- **Date & evidence:** Pending
+- **Approved/rejected by:** Project owner
+- **Date & evidence:** 2026-11-24, project conversation: “Accept both”
 - **Issue backlink:** Issue #27 decisions section
-- **Affected Issue AC revisions and reapproval:** Pending
+- **Affected Issue AC revisions and reapproval:** Owner accepted the requested reconciliation in the project conversation on 2026-11-24.
 - **Linked implementation PR:** Pending
 - **Supersession note:** None
 
 ## Chronological addenda
 
-None.
+2026-11-24: The owner responded “Accept both” to the explicit requests to accept ADR-0006 and ADR-0007 and approve the associated issue clarification and specification reconciliation. The earlier proposed wording records the state before acceptance.
