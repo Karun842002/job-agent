@@ -67,6 +67,16 @@ func TestAuthorisedPublicBoards(t *testing.T) {
 				t.Fatalf("existing policy for %s; refusing to replace it", tc.host)
 			}
 			hosts = append(hosts, tc.host)
+			scope := "board:" + tc.provider + ":" + tc.key
+			result, err = db.ExecContext(ctx, "INSERT INTO source_policies (source,discovery_allowed,evidence,last_reviewed_at) VALUES ($1,true,$2,now()) ON CONFLICT DO NOTHING", scope, "owner-authorised temporary public board check")
+			if err != nil {
+				t.Fatal(err)
+			}
+			count, err = result.RowsAffected()
+			if err != nil || count != 1 {
+				t.Fatalf("existing policy for %s; refusing to replace it", scope)
+			}
+			hosts = append(hosts, scope)
 			board, err := (Store{DB: db}).CreateBoard(ctx, Board{CompanyID: company.ID, Provider: tc.provider, Key: tc.key})
 			if err != nil {
 				t.Fatal(err)

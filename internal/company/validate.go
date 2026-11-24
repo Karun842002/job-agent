@@ -90,7 +90,14 @@ func (v *Validator) Validate(ctx context.Context, id int64) (ValidationResult, e
 		}
 		return ValidationResult{}, errors.New("unsupported board provider")
 	}
-	if err := policy.CheckSource(ctx, v.DB, host, policy.Discovery); err != nil {
+	boardScope := "board:" + board.Provider + ":" + board.Key
+	authorize := func(ctx context.Context, requestHost string) error {
+		if err := policy.CheckSource(ctx, v.DB, boardScope, policy.Discovery); err != nil {
+			return err
+		}
+		return policy.CheckSource(ctx, v.DB, requestHost, policy.Discovery)
+	}
+	if err := authorize(ctx, host); err != nil {
 		if errors.Is(err, policy.ErrCapabilityDenied) || errors.Is(err, policy.ErrSourceUnregistered) {
 			if updateErr := v.setResult(ctx, board, "blocked_by_policy", nil); updateErr != nil {
 				return ValidationResult{}, updateErr
@@ -100,9 +107,7 @@ func (v *Validator) Validate(ctx context.Context, id int64) (ValidationResult, e
 	}
 	fetchCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	status, data, err := v.fetch(fetchCtx, (&url.URL{Scheme: "https", Host: host, Path: path}).String(), []string{host}, func(ctx context.Context, host string) error {
-		return policy.CheckSource(ctx, v.DB, host, policy.Discovery)
-	})
+	status, data, err := v.fetch(fetchCtx, (&url.URL{Scheme: "https", Host: host, Path: path}).String(), []string{host}, authorize)
 	if err != nil {
 		state := "degraded"
 		if errors.Is(err, policy.ErrCapabilityDenied) || errors.Is(err, policy.ErrSourceUnregistered) {

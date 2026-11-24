@@ -67,6 +67,16 @@ func TestProviderValidationIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := NewValidator(db).Validate(ctx, greenhouse.ID); !errors.Is(err, policy.ErrSourceUnregistered) {
+		t.Fatalf("missing board-specific policy was accepted: %v", err)
+	}
+	for _, board := range []Board{greenhouse, ashby} {
+		scope := "board:" + board.Provider + ":" + board.Key
+		if _, err := db.ExecContext(ctx, "INSERT INTO source_policies(source,discovery_allowed) VALUES($1,true)", scope); err != nil {
+			t.Fatal(err)
+		}
+		inserted = append(inserted, scope)
+	}
 	validator := NewValidator(db)
 	status := http.StatusOK
 	body := `{"name":"Fixture"}`
