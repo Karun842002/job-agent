@@ -15,4 +15,4 @@ TEST_OTEL_COLLECTOR="http://127.0.0.1:4318/v1/traces" \
 go test -count=1 -run TestCollectorRedactsGeneration ./internal/platform/langfuse
 ```
 
-The local trace stack is for synthetic data. Automatic 24-hour deletion across telemetry and backups is tracked in issue #27 and must be verified before ingesting real candidate data.
+The local trace stack is for synthetic data. See [current retention behavior](RETENTION.md). The separate candidate-data gate remains in place under ADR-0007 pending explicit reconciliation.

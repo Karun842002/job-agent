@@ -3,6 +3,7 @@ package company
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,6 +21,7 @@ type dynamicPageHarness struct {
 	server     *httptest.Server
 	rendered   string
 	candidates []Candidate
+	evidence   []byte
 }
 
 func (h *dynamicPageHarness) NotifyQueued(ctx context.Context, _ browser.BrowserTaskID) error {
@@ -46,6 +48,11 @@ func (h *dynamicPageHarness) NotifyQueued(ctx context.Context, _ browser.Browser
 		return err
 	}
 	h.candidates = found
+	// The mock returns an allowlisted board identity, never the rendered DOM.
+	h.evidence, err = json.Marshal(found)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -126,7 +133,8 @@ func TestMockHarnessDiscoversAndValidatesDynamicBoard(t *testing.T) {
 			}
 		}
 	})
-	mock := &dynamicPageHarness{server: page, rendered: `<html><body><a href="https://jobs.ashbyhq.com/dynamic-` + suffix + `">Current openings</a></body></html>`}
+	const privateMarker = "synthetic-private-marker"
+	mock := &dynamicPageHarness{server: page, rendered: `<html><body><p>` + privateMarker + `</p><a href="https://jobs.ashbyhq.com/dynamic-` + suffix + `?token=` + privateMarker + `">Current openings</a></body></html>`}
 	task := browser.BrowserTask{WorkflowID: workflowID, StepRunID: "dynamic-read", Source: source,
 		Origin: origin, AllowedOrigins: []string{origin}, Action: "NAVIGATE", AllowedActions: []string{"NAVIGATE", "READ"},
 		PolicySnapshotID: snapshotID, PolicyVersion: version, Deadline: time.Now().Add(time.Minute), CallbackID: "dynamic-" + suffix}
@@ -140,6 +148,16 @@ func TestMockHarnessDiscoversAndValidatesDynamicBoard(t *testing.T) {
 	}
 	if len(mock.candidates) != 1 || mock.candidates[0] != (Candidate{Provider: "ashby", Key: "dynamic-" + suffix}) {
 		t.Fatalf("dynamic candidates: %+v", mock.candidates)
+	}
+	if strings.Contains(string(mock.evidence), privateMarker) || strings.Contains(string(mock.evidence), "token=") || strings.Contains(string(mock.evidence), "<html") {
+		t.Fatal("mock evidence retained raw page content or query parameters")
+	}
+	var storedTask string
+	if err := db.QueryRowContext(ctx, "SELECT row_to_json(t)::text FROM browser_tasks t WHERE id=$1", id).Scan(&storedTask); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(storedTask, privateMarker) || strings.Contains(storedTask, "token=") || strings.Contains(storedTask, "<html") {
+		t.Fatal("durable task retained raw page content or query parameters")
 	}
 	readTask := task
 	readTask.Action, readTask.CallbackID = "READ", "read-"+suffix
