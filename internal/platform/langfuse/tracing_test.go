@@ -13,6 +13,19 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func TestProviderRejectsRemoteEndpoints(t *testing.T) {
+	for _, endpoint := range []string{
+		"https://example.com/v1/traces", "http://192.168.1.1:4318/v1/traces",
+		"http://localhost:4318/v1/traces", "http://127.0.0.1:4318/other",
+		"http://user@127.0.0.1:4318/v1/traces", "http://127.0.0.1:4318/v1/traces?x=y",
+	} {
+		if provider, err := NewProvider(context.Background(), endpoint); err == nil {
+			provider.Shutdown(context.Background())
+			t.Fatalf("accepted endpoint %q", endpoint)
+		}
+	}
+}
+
 func TestGenerationOTLP(t *testing.T) {
 	bodies := make(chan []byte, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
