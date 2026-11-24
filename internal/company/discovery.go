@@ -22,8 +22,8 @@ var embeddedURL = regexp.MustCompile(`https?://[^\s"'<>\\]+`)
 
 // Candidate identifies a board discovered from a careers page.
 type Candidate struct {
-	Provider string
-	Key      string
+	Provider string `json:"provider"`
+	Key      string `json:"board_key"`
 }
 
 // Inspector finds board references without running a browser or model.
