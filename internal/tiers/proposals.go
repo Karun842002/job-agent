@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"karun.tech/jobagent/internal/audit"
 	"karun.tech/jobagent/internal/policy"
 )
@@ -24,26 +25,90 @@ type ProposalInput struct {
 	ExpiresAt    time.Time
 }
 
+func validateProposalInput(in ProposalInput) (string, error) {
+	if in.CompanyID <= 0 || (in.RoleFamilyID != nil && *in.RoleFamilyID <= 0) || !in.ExpiresAt.After(time.Now()) {
+		return "", ErrInvalid
+	}
+	u, err := url.Parse(in.SourceURL)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Port() != "" {
+		return "", ErrInvalid
+	}
+	return strings.ToLower(strings.TrimSuffix(u.Hostname(), ".")), nil
+}
+
 // Propose applies the relevance rule and records a single prompt per identity.
 // AUDIT stores only a preview and OFF rejects the operation. Evidence collection
 // remains the caller's responsibility; source permissions are checked here.
 func (s Store) Propose(ctx context.Context, in ProposalInput) (int64, bool, error) {
-	if in.CompanyID <= 0 || (in.RoleFamilyID != nil && *in.RoleFamilyID <= 0) || !in.ExpiresAt.After(time.Now()) {
-		return 0, false, ErrInvalid
-	}
-	u, err := url.Parse(in.SourceURL)
-	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Port() != "" {
-		return 0, false, ErrInvalid
+	host, err := validateProposalInput(in)
+	if err != nil {
+		return 0, false, err
 	}
 	if !Relevant(in.Evidence) {
 		return 0, false, nil
 	}
-	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, false, err
 	}
 	defer tx.Rollback()
+	id, created, err := proposeTx(ctx, tx, in, host)
+	if err != nil {
+		return 0, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, false, err
+	}
+	return id, created, nil
+}
+
+// ProposeObservation reads verified resume evidence and source reliability,
+// evaluates a structured observation, and writes its proposal atomically.
+// Serialization failures are retried because no external effects occur here.
+func (s Store) ProposeObservation(ctx context.Context, in ProposalInput, observed Observation) (int64, bool, error) {
+	host, err := validateProposalInput(in)
+	if err != nil {
+		return 0, false, err
+	}
+	for attempt := 0; attempt < 3; attempt++ {
+		id, created, err := s.proposeObservationOnce(ctx, in, observed, host)
+		var pgerr *pgconn.PgError
+		if err == nil || !errors.As(err, &pgerr) || pgerr.Code != "40001" {
+			return id, created, err
+		}
+	}
+	return 0, false, errors.New("proposal could not be serialized after three attempts")
+}
+
+func (s Store) proposeObservationOnce(ctx context.Context, in ProposalInput, observed Observation, host string) (int64, bool, error) {
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return 0, false, err
+	}
+	defer tx.Rollback()
+	facts, err := loadKnowledge(ctx, tx)
+	if err != nil {
+		return 0, false, err
+	}
+	reliability, err := loadSourceReliability(ctx, tx, host)
+	if err != nil {
+		return 0, false, err
+	}
+	in.Evidence = EvaluateObservation(facts, observed, reliability)
+	if !Relevant(in.Evidence) {
+		return 0, false, tx.Commit()
+	}
+	id, created, err := proposeTx(ctx, tx, in, host)
+	if err != nil {
+		return 0, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, false, err
+	}
+	return id, created, nil
+}
+
+func proposeTx(ctx context.Context, tx *sql.Tx, in ProposalInput, host string) (int64, bool, error) {
 	if err := policy.CheckSourceTx(ctx, tx, host, policy.Discovery); err != nil {
 		return 0, false, err
 	}
@@ -86,22 +151,19 @@ func (s Store) Propose(ctx context.Context, in ProposalInput) (int64, bool, erro
 		if err != nil {
 			return 0, false, err
 		}
-		return id, false, tx.Commit()
+		return id, false, nil
 	}
 	var id int64
 	err = tx.QueryRowContext(ctx, `INSERT INTO tier_proposals(company_id,role_family_id,evidence,source_url,explanation,expires_at)
 		VALUES($1,$2,$3,$4,'deterministic relevance checks passed',$5) ON CONFLICT DO NOTHING RETURNING id`,
 		in.CompanyID, in.RoleFamilyID, evidence, in.SourceURL, in.ExpiresAt).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, false, tx.Commit()
+		return 0, false, nil
 	}
 	if err != nil {
 		return 0, false, err
 	}
 	if _, err := audit.Append(ctx, tx, audit.Event{Name: "tier_proposed", Actor: "system", Cause: "deterministic_relevance", PolicySnapshotID: &snapshot, CompanyID: &in.CompanyID}); err != nil {
-		return 0, false, err
-	}
-	if err := tx.Commit(); err != nil {
 		return 0, false, err
 	}
 	return id, true, nil

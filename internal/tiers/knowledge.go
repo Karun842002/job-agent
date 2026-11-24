@@ -23,10 +23,19 @@ type Observation struct {
 	Skills   []string
 }
 
+type evidenceQuerier interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
 // LoadKnowledge reads the latest verified version of each fact from the
 // evidence database intended for resume curation. It does not log fact values.
 func LoadKnowledge(ctx context.Context, db *sql.DB) ([]KnowledgeFact, error) {
-	rows, err := db.QueryContext(ctx, `SELECT kind,value FROM (
+	return loadKnowledge(ctx, db)
+}
+
+func loadKnowledge(ctx context.Context, q evidenceQuerier) ([]KnowledgeFact, error) {
+	rows, err := q.QueryContext(ctx, `SELECT kind,value FROM (
 		SELECT DISTINCT ON (fact_key) fact_key,kind,value,verified
 		FROM career_evidence ORDER BY fact_key,version DESC
 	) latest WHERE verified ORDER BY fact_key`)
@@ -48,8 +57,12 @@ func LoadKnowledge(ctx context.Context, db *sql.DB) ([]KnowledgeFact, error) {
 // LoadSourceReliability returns an explicit assessment, not a permission to
 // fetch the source. Missing assessments remain unknown.
 func LoadSourceReliability(ctx context.Context, db *sql.DB, source string) (Match, error) {
+	return loadSourceReliability(ctx, db, source)
+}
+
+func loadSourceReliability(ctx context.Context, q evidenceQuerier, source string) (Match, error) {
 	var reliable bool
-	err := db.QueryRowContext(ctx, "SELECT reliable FROM source_reliability WHERE source=$1", source).Scan(&reliable)
+	err := q.QueryRowContext(ctx, "SELECT reliable FROM source_reliability WHERE source=$1", source).Scan(&reliable)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Unknown, nil
 	}
