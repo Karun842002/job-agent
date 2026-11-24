@@ -53,7 +53,7 @@ func TestProposePolicyAndDeduplicationIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := Store{DB: db}
-	in := ProposalInput{CompanyID: company, SourceURL: "https://" + host + "/careers", Evidence: RelevanceEvidence{Matches, Matches, Matches, Matches, NoMatch}, ExpiresAt: time.Now().Add(time.Hour)}
+	in := ProposalInput{CompanyID: company, SourceURL: "https://" + host + "/careers", evidence: RelevanceEvidence{Matches, Matches, Matches, Matches, NoMatch}, ExpiresAt: time.Now().Add(time.Hour)}
 	type outcome struct {
 		id      int64
 		created bool
@@ -65,7 +65,7 @@ func TestProposePolicyAndDeduplicationIntegration(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			id, created, err := store.Propose(ctx, in)
+			id, created, err := store.propose(ctx, in)
 			results <- outcome{id, created, err}
 		}()
 	}
@@ -87,7 +87,7 @@ func TestProposePolicyAndDeduplicationIntegration(t *testing.T) {
 		t.Fatalf("concurrent creation count=%d, want 1", createdCount)
 	}
 	var created bool
-	_, created, err = store.Propose(ctx, in)
+	_, created, err = store.propose(ctx, in)
 	if err != nil || created {
 		t.Fatalf("duplicate created=%v err=%v", created, err)
 	}
@@ -98,7 +98,7 @@ func TestProposePolicyAndDeduplicationIntegration(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "UPDATE source_policies SET discovery_allowed=false WHERE source=$1", host); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.Propose(ctx, in); !errors.Is(err, policy.ErrCapabilityDenied) {
+	if _, _, err := store.propose(ctx, in); !errors.Is(err, policy.ErrCapabilityDenied) {
 		t.Fatalf("denied source: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE source_policies SET discovery_allowed=true WHERE source=$1", host); err != nil {
@@ -107,13 +107,13 @@ func TestProposePolicyAndDeduplicationIntegration(t *testing.T) {
 	if _, err := store.SetMode(ctx, ModeChange{StepKey: "tier_proposal", Mode: policy.Off}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.Propose(ctx, in); !errors.Is(err, policy.ErrIntakeDenied) {
+	if _, _, err := store.propose(ctx, in); !errors.Is(err, policy.ErrIntakeDenied) {
 		t.Fatalf("OFF mode: %v", err)
 	}
 	if _, err := store.SetMode(ctx, ModeChange{StepKey: "tier_proposal", Mode: policy.Audit}); err != nil {
 		t.Fatal(err)
 	}
-	preview, created, err := store.Propose(ctx, in)
+	preview, created, err := store.propose(ctx, in)
 	if err != nil || created || preview == 0 {
 		t.Fatalf("AUDIT preview=%d created=%v err=%v", preview, created, err)
 	}

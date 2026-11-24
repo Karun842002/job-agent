@@ -21,7 +21,7 @@ type ProposalInput struct {
 	CompanyID    int64
 	RoleFamilyID *int64
 	SourceURL    string
-	Evidence     RelevanceEvidence
+	evidence     RelevanceEvidence
 	ExpiresAt    time.Time
 }
 
@@ -36,15 +36,13 @@ func validateProposalInput(in ProposalInput) (string, error) {
 	return strings.ToLower(strings.TrimSuffix(u.Hostname(), ".")), nil
 }
 
-// Propose applies the relevance rule and records a single prompt per identity.
-// AUDIT stores only a preview and OFF rejects the operation. Evidence collection
-// remains the caller's responsibility; source permissions are checked here.
-func (s Store) Propose(ctx context.Context, in ProposalInput) (int64, bool, error) {
+// propose is the internal policy-boundary helper for evaluated evidence.
+func (s Store) propose(ctx context.Context, in ProposalInput) (int64, bool, error) {
 	host, err := validateProposalInput(in)
 	if err != nil {
 		return 0, false, err
 	}
-	if !Relevant(in.Evidence) {
+	if !Relevant(in.evidence) {
 		return 0, false, nil
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -94,8 +92,8 @@ func (s Store) proposeObservationOnce(ctx context.Context, in ProposalInput, obs
 	if err != nil {
 		return 0, false, err
 	}
-	in.Evidence = EvaluateObservation(facts, observed, reliability)
-	if !Relevant(in.Evidence) {
+	in.evidence = EvaluateObservation(facts, observed, reliability)
+	if !Relevant(in.evidence) {
 		return 0, false, tx.Commit()
 	}
 	id, created, err := proposeTx(ctx, tx, in, host)
@@ -138,7 +136,7 @@ func proposeTx(ctx context.Context, tx *sql.Tx, in ProposalInput, host string) (
 			return 0, false, policy.ErrIntakeDenied
 		}
 	}
-	evidence, err := json.Marshal(in.Evidence)
+	evidence, err := json.Marshal(in.evidence)
 	if err != nil {
 		return 0, false, err
 	}
