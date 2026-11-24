@@ -32,7 +32,17 @@ func TestTierRoutesRequireBearerAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = db.ExecContext(context.Background(), "DELETE FROM companies WHERE id=$1", company.ID) })
+	t.Cleanup(func() {
+		cleanup, err := sql.Open("pgx", databaseURL)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer cleanup.Close()
+		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM companies WHERE id=$1", company.ID); err != nil {
+			t.Error(err)
+		}
+	})
 	handler := Handler(store, "integration-token")
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/tiers/company", nil)
 	response := httptest.NewRecorder()

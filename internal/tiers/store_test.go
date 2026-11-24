@@ -45,7 +45,17 @@ func TestTierManagementIntegration(t *testing.T) {
 	if err := db.QueryRowContext(ctx, "INSERT INTO companies(name,domain) VALUES($1,$2) RETURNING id", "Tier fixture", "tier-"+suffix+".example").Scan(&companyID); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = db.ExecContext(context.Background(), "DELETE FROM companies WHERE id=$1", companyID) })
+	t.Cleanup(func() {
+		cleanup, err := sql.Open("pgx", databaseURL)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer cleanup.Close()
+		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM companies WHERE id=$1", companyID); err != nil {
+			t.Error(err)
+		}
+	})
 	if _, err := db.ExecContext(ctx, `INSERT INTO tier_assignments(axis,target_id,tier_id,tier_version,actor,reason)
 		SELECT 'company',$1,id,version,'system','initial_default' FROM policy_tiers WHERE axis='company' AND id='UNASSIGNED'`, companyID); err != nil {
 		t.Fatal(err)
