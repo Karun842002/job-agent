@@ -15,6 +15,8 @@ This file is the **index**, not another requirements specification. Each accepte
 
 | [ADR-0005](0005-provider-validation-permission.md) | Temporary public provider-board validation | Accepted (owner instruction) | §3.1–3.3; Phase 1 exit; FR-03; #21 | — |
 
+| [ADR-0006](0006-relevance-qualification.md) | Deterministic relevance qualification | Proposed | FR-25; P1-004; #19 | — |
+
 ## Minimal operating rules
 
 1. **Trigger / pause:** When the agent lacks confidence or cannot determine a consequential next step from approved requirements and evidence, **stop affected work and ask the human**. Record the question and `blocked` state on the Issue. When the answer produces a new requirement/design/implementation decision, an ADR and Issue backlink are mandatory. Ordinary clear, reversible local fixes do not need an ADR.
