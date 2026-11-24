@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"karun.tech/jobagent/internal/policy"
 )
 
 // Handler exposes registry operations using a server-configured bearer token.
@@ -150,6 +152,14 @@ func Handler(store Store, token string) http.Handler {
 		value.ID = id
 		respond(w, nil, store.UpdateBoard(r.Context(), value), http.StatusNoContent)
 	})
+	mux.HandleFunc("POST /api/v1/boards/{id}/validate", func(w http.ResponseWriter, r *http.Request) {
+		id, ok := requestID(w, r)
+		if !ok {
+			return
+		}
+		result, err := NewValidator(store.DB).Validate(r.Context(), id)
+		respond(w, result, err, http.StatusOK)
+	})
 	mux.HandleFunc("PUT /api/v1/boards/{id}/metadata", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := requestID(w, r)
 		if !ok {
@@ -244,6 +254,8 @@ func respond(w http.ResponseWriter, value any, err error, success int) {
 			http.Error(w, "not found", http.StatusNotFound)
 		case errors.As(err, &pgerr) && (pgerr.Code == "23505" || pgerr.Code == "23503"):
 			http.Error(w, "registry conflict", http.StatusConflict)
+		case errors.Is(err, policy.ErrCapabilityDenied), errors.Is(err, policy.ErrSourceUnregistered):
+			http.Error(w, "source policy denies validation", http.StatusForbidden)
 		case errors.Is(err, ErrInvalidInput):
 			http.Error(w, "invalid request", http.StatusBadRequest)
 		default:

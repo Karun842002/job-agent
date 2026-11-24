@@ -147,6 +147,18 @@ paths:
       responses:
         '201': { description: Board created, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }
         '409': { description: Company or board conflict }
+  /api/v1/boards/{id}/validate:
+    parameters: [{ $ref: '#/components/parameters/ID' }]
+    post:
+      summary: Validate a board under source policy
+      responses:
+        '200':
+          description: Provider board verified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationResult' }
+        '403': { description: Source policy denies validation }
+        '404': { description: Board not found }
   /api/v1/boards/{id}/metadata:
     parameters: [{ $ref: '#/components/parameters/ID' }]
     put:
@@ -228,3 +240,11 @@ components:
         provenance: { type: object }
         last_verified_at: { type: string, format: date-time, nullable: true }
         operator_override: { type: object }
+    ValidationResult:
+      type: object
+      required: [provider]
+      properties:
+        provider: { type: string }
+        listed: { type: integer, minimum: 0 }
+        unlisted: { type: integer, minimum: 0 }
+        unknown: { type: integer, minimum: 0 }

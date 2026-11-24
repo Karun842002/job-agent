@@ -17,7 +17,7 @@ import (
 	"github.com/temoto/robotstxt"
 )
 
-const maxResponseBytes = 1 << 20
+const maxResponseBytes = 8 << 20
 
 var specialNetworks = []netip.Prefix{
 	netip.MustParsePrefix("0.0.0.0/8"), netip.MustParsePrefix("100.64.0.0/10"),
