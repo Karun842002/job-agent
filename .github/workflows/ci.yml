@@ -44,7 +44,8 @@ jobs:
       - name: PostgreSQL integration tests
         env:
           TEST_DATABASE_URL: postgres://jobagent:jobagent-local@127.0.0.1:5432/jobagent?sslmode=disable
-        run: go test -count=1 -race ./...
+        # Shared integration DB stores immutable policy snapshots; serialize package fixtures.
+        run: go test -p 1 -count=1 -race ./...
       - name: Validate migration rollback and reapply
         run: |
           docker compose --profile tools run --rm migrate down 1

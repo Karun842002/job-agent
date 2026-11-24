@@ -21,6 +21,7 @@ const (
 type Axis struct {
 	TierID  string
 	Enabled bool
+	Version int64
 	Mode    Mode
 }
 

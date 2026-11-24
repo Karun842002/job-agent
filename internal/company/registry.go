@@ -19,6 +19,7 @@ type Company struct {
 	ID     int64  `json:"id"`
 	Name   string `json:"name"`
 	Domain string `json:"domain"`
+	TierID string `json:"tier_id"`
 }
 
 // Seed is a company-owned careers page or other curated discovery seed.
@@ -78,6 +79,11 @@ func (s Store) CreateCompany(ctx context.Context, company Company) (Company, err
 	if err != nil {
 		return Company{}, fmt.Errorf("create company: %w", err)
 	}
+	company.TierID = "UNASSIGNED"
+	if _, err := tx.ExecContext(ctx, `INSERT INTO tier_assignments(axis,target_id,tier_id,tier_version,actor,reason)
+		SELECT 'company',$1,id,version,'system','initial_default' FROM policy_tiers WHERE axis='company' AND id='UNASSIGNED'`, company.ID); err != nil {
+		return Company{}, err
+	}
 	if err := auditMutation(ctx, tx, "company_created", company.ID); err != nil {
 		return Company{}, err
 	}
@@ -90,7 +96,7 @@ func (s Store) CreateCompany(ctx context.Context, company Company) (Company, err
 // GetCompany reads a company by ID.
 func (s Store) GetCompany(ctx context.Context, id int64) (Company, error) {
 	var company Company
-	err := s.DB.QueryRowContext(ctx, "SELECT id, name, domain FROM companies WHERE id=$1", id).Scan(&company.ID, &company.Name, &company.Domain)
+	err := s.DB.QueryRowContext(ctx, "SELECT id, name, domain, company_tier_id FROM companies WHERE id=$1", id).Scan(&company.ID, &company.Name, &company.Domain, &company.TierID)
 	return company, err
 }
 
@@ -254,7 +260,7 @@ func (s Store) change(ctx context.Context, event, query string, args ...any) err
 
 // ListCompanies returns up to 100 companies after the supplied ID.
 func (s Store) ListCompanies(ctx context.Context, after int64) ([]Company, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT id,name,domain FROM companies WHERE id>$1 ORDER BY id LIMIT 100", after)
+	rows, err := s.DB.QueryContext(ctx, "SELECT id,name,domain,company_tier_id FROM companies WHERE id>$1 ORDER BY id LIMIT 100", after)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +268,7 @@ func (s Store) ListCompanies(ctx context.Context, after int64) ([]Company, error
 	companies := make([]Company, 0)
 	for rows.Next() {
 		var value Company
-		if err := rows.Scan(&value.ID, &value.Name, &value.Domain); err != nil {
+		if err := rows.Scan(&value.ID, &value.Name, &value.Domain, &value.TierID); err != nil {
 			return nil, err
 		}
 		companies = append(companies, value)

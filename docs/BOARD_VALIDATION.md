@@ -6,4 +6,4 @@ Greenhouse board metadata confirms the board is reachable. It does not report li
 
 The provider API references are the [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html) and the [Ashby Job Postings API](https://developers.ashbyhq.com/docs/public-job-posting-api). Provider documentation does not replace source-policy review.
 
-The live integration check is opt-in. ADR-0005 records the owner's temporary permission for the providers' own `greenhouse` and `ashby` boards. The test creates and removes its own policy entries and fixture records, and refuses to replace existing source policies. Run it only with a disposable `TEST_DATABASE_URL` and that specific permission.
+The live integration check is opt-in. ADR-0005 records the owner's temporary permission for the providers' own `greenhouse` and `ashby` boards. The test creates and removes its source-policy entries and fixture records, refuses to replace existing source policies, and appends an immutable policy snapshot. Run it only with a disposable `TEST_DATABASE_URL` and that specific permission, then discard the database.

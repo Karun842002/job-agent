@@ -135,12 +135,28 @@ func insertException(ctx context.Context, tx *sql.Tx, seed Seed, reason string) 
 	return nil
 }
 
-func (i *Inspector) queueException(ctx context.Context, seed Seed, reason string) error {
+func lockSeedIdentity(ctx context.Context, tx *sql.Tx, seed Seed) error {
+	var companyID int64
+	var pageURL string
+	err := tx.QueryRowContext(ctx, "SELECT company_id,url FROM company_seeds WHERE id=$1 FOR SHARE", seed.ID).Scan(&companyID, &pageURL)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && (companyID != seed.CompanyID || pageURL != seed.URL)) {
+		return policy.ErrPolicyChanged
+	}
+	return err
+}
+
+func (i *Inspector) queueException(ctx context.Context, seed Seed, reason string, guard *intakeGuard, sourceAllowed bool) error {
 	tx, err := i.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if err := guard.checkIntentCommit(ctx, tx, sourceAllowed); err != nil {
+		return err
+	}
+	if err := lockSeedIdentity(ctx, tx, seed); err != nil {
+		return err
+	}
 	if err := insertException(ctx, tx, seed, reason); err != nil {
 		return err
 	}
@@ -154,22 +170,15 @@ func (i *Inspector) Discover(ctx context.Context, seedID int64) ([]Candidate, er
 	if err != nil {
 		return nil, err
 	}
-	if err := policy.CheckGlobal(ctx, i.DB); err != nil {
-		if errors.Is(err, policy.ErrGlobalStopped) {
-			if queueErr := i.queueException(ctx, seed, "global_policy_blocked"); queueErr != nil {
-				return nil, queueErr
-			}
-		}
-		return nil, err
-	}
 	target, err := url.Parse(seed.URL)
 	if err != nil || target.Scheme != "https" || target.Hostname() == "" || target.User != nil {
 		return nil, errors.New("seed must be an HTTPS URL")
 	}
 	host := strings.ToLower(strings.TrimSuffix(target.Hostname(), "."))
-	if err := policy.CheckSource(ctx, i.DB, host, policy.Discovery); err != nil {
-		if errors.Is(err, policy.ErrCapabilityDenied) || errors.Is(err, policy.ErrSourceUnregistered) {
-			if queueErr := i.queueException(ctx, seed, "source_policy_blocked"); queueErr != nil {
+	guard, err := startIntake(ctx, i.DB, seed.CompanyID, "discover_company", host)
+	if err != nil {
+		if guard != nil && guard.mode == policy.Live && sourceDenial(err) {
+			if queueErr := i.queueException(ctx, seed, "source_policy_blocked", guard, false); queueErr != nil {
 				return nil, queueErr
 			}
 		}
@@ -193,21 +202,27 @@ func (i *Inspector) Discover(ctx context.Context, seedID int64) ([]Candidate, er
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	status, body, finalURL, err := i.fetch(ctx, seed.URL, hosts, func(ctx context.Context, host string) error {
-		return policy.CheckSource(ctx, i.DB, host, policy.Discovery)
-	})
+	status, body, finalURL, err := i.fetch(fetchCtx, seed.URL, hosts, guard.authorize)
 	if err != nil {
-		if errors.Is(err, httpclient.ErrRobotsDenied) || errors.Is(err, policy.ErrCapabilityDenied) || errors.Is(err, policy.ErrSourceUnregistered) {
-			if queueErr := i.queueException(ctx, seed, "source_policy_blocked"); queueErr != nil {
+		if guard.mode == policy.Audit {
+			if previewErr := guard.preview(ctx, fmt.Sprintf("seed-%d", seed.ID), map[string]any{"outcome": "blocked_or_failed"}); previewErr != nil {
+				return nil, previewErr
+			}
+		} else if errors.Is(err, httpclient.ErrRobotsDenied) || sourceDenial(err) {
+			if queueErr := i.queueException(ctx, seed, "source_policy_blocked", guard, !sourceDenial(err)); queueErr != nil {
 				return nil, queueErr
 			}
 		}
 		return nil, err
 	}
 	if status == http.StatusForbidden || status == http.StatusUnauthorized {
-		if err := i.queueException(ctx, seed, "site_blocked"); err != nil {
+		if guard.mode == policy.Audit {
+			if err := guard.preview(ctx, fmt.Sprintf("seed-%d", seed.ID), map[string]any{"outcome": "site_blocked"}); err != nil {
+				return nil, err
+			}
+		} else if err := i.queueException(ctx, seed, "site_blocked", guard, true); err != nil {
 			return nil, err
 		}
 		return nil, errors.New("careers page is blocked")
@@ -224,6 +239,14 @@ func (i *Inspector) Discover(ctx context.Context, seedID int64) ([]Candidate, er
 		return nil, err
 	}
 	final.RawQuery, final.Fragment, final.User = "", "", nil
+	if guard.mode == policy.Audit {
+		if err := guard.preview(ctx, fmt.Sprintf("seed-%d", seed.ID), map[string]any{
+			"candidates": found, "dynamic_review": len(found) == 0 && hasScript,
+		}); err != nil {
+			return nil, err
+		}
+		return found, nil
+	}
 	provenance, err := json.Marshal(map[string]any{"seed_id": seed.ID, "source_url": final.String()})
 	if err != nil {
 		return nil, err
@@ -233,6 +256,12 @@ func (i *Inspector) Discover(ctx context.Context, seedID int64) ([]Candidate, er
 		return nil, err
 	}
 	defer tx.Rollback()
+	if err := guard.checkCommit(ctx, tx, strings.ToLower(strings.TrimSuffix(final.Hostname(), "."))); err != nil {
+		return nil, err
+	}
+	if err := lockSeedIdentity(ctx, tx, seed); err != nil {
+		return nil, err
+	}
 	for _, candidate := range found {
 		var id int64
 		err := tx.QueryRowContext(ctx, `INSERT INTO ats_boards (company_id,provider,region,board_key,provenance)

@@ -32,17 +32,11 @@ func TestProviderValidationIntegration(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", version); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		cleanup, err := sql.Open("pgx", databaseURL)
-		if err != nil {
-			t.Error(err)
-			return
+	for _, step := range []string{"discover_company", "validate_board"} {
+		if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,$2,'LIVE')", version, step); err != nil {
+			t.Fatal(err)
 		}
-		defer cleanup.Close()
-		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM policy_versions WHERE version=$1", version); err != nil {
-			t.Error(err)
-		}
-	})
+	}
 	suffix := fmt.Sprintf("%d", version)
 	store := Store{DB: db}
 	company, err := store.CreateCompany(ctx, Company{Name: "Validator fixture", Domain: "validator-" + suffix + ".example"})
@@ -80,23 +74,6 @@ func TestProviderValidationIntegration(t *testing.T) {
 	}
 	ashby, err := store.CreateBoard(ctx, Board{CompanyID: company.ID, Provider: "ashby", Key: "fixture-" + suffix})
 	if err != nil {
-		t.Fatal(err)
-	}
-	const stoppedVersion int64 = 9223372036854775807
-	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,false)", stoppedVersion); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		cleanup, err := sql.Open("pgx", databaseURL)
-		if err == nil {
-			defer cleanup.Close()
-			_, _ = cleanup.ExecContext(context.Background(), "DELETE FROM policy_versions WHERE version=$1", stoppedVersion)
-		}
-	})
-	if _, err := NewValidator(db).Validate(ctx, greenhouse.ID); !errors.Is(err, policy.ErrGlobalStopped) {
-		t.Fatalf("global stop was bypassed: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, "DELETE FROM policy_versions WHERE version=$1", stoppedVersion); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := NewValidator(db).Validate(ctx, greenhouse.ID); !errors.Is(err, policy.ErrSourceUnregistered) {
@@ -190,5 +167,68 @@ func TestProviderValidationIntegration(t *testing.T) {
 	}
 	if _, err := validator.Validate(ctx, greenhouse.ID); err == nil || !strings.Contains(err.Error(), "changed during validation") {
 		t.Fatalf("stale board validation was accepted: %v", err)
+	}
+	auditVersion := version + 1
+	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", auditVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,'validate_board','AUDIT')", auditVersion); err != nil {
+		t.Fatal(err)
+	}
+	flipToOff := false
+	offVersion := auditVersion + 1
+	validator.fetch = func(ctx context.Context, target string, hosts []string, authorize func(context.Context, string) error) (int, []byte, error) {
+		if err := authorize(ctx, hosts[0]); err != nil {
+			return 0, nil, err
+		}
+		if flipToOff {
+			if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", offVersion); err != nil {
+				return 0, nil, err
+			}
+			if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,'validate_board','OFF')", offVersion); err != nil {
+				return 0, nil, err
+			}
+		}
+		return http.StatusOK, []byte(`{"jobs":[{"isListed":true}]}`), nil
+	}
+	beforeAudit, err := store.GetBoard(ctx, ashby.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := validator.Validate(ctx, ashby.ID); err != nil {
+		t.Fatalf("AUDIT validation: %v", err)
+	}
+	afterAudit, err := store.GetBoard(ctx, ashby.ID)
+	if err != nil || afterAudit.Metadata.State != beforeAudit.Metadata.State || string(afterAudit.Metadata.Capabilities) != string(beforeAudit.Metadata.Capabilities) {
+		t.Fatalf("AUDIT mutated board state: before=%+v after=%+v err=%v", beforeAudit.Metadata, afterAudit.Metadata, err)
+	}
+	var previews int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM audit_previews WHERE policy_snapshot_id IN (SELECT id FROM effective_step_policies WHERE policy_version=$1)", auditVersion).Scan(&previews); err != nil || previews != 1 {
+		t.Fatalf("AUDIT preview count %d: %v", previews, err)
+	}
+	flipToOff = true
+	if _, err := validator.Validate(ctx, ashby.ID); !errors.Is(err, policy.ErrPolicyChanged) {
+		t.Fatalf("AUDIT result committed after policy changed to OFF: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM audit_previews WHERE policy_snapshot_id IN (SELECT id FROM effective_step_policies WHERE policy_version=$1)", offVersion).Scan(&previews); err != nil || previews != 0 {
+		t.Fatalf("OFF policy saved audit preview: count=%d err=%v", previews, err)
+	}
+	before = calls
+	if _, err := validator.Validate(ctx, ashby.ID); !errors.Is(err, policy.ErrIntakeDenied) || calls != before {
+		t.Fatalf("OFF validation had effect: err=%v calls=%d before=%d", err, calls, before)
+	}
+	afterOff, err := store.GetBoard(ctx, ashby.ID)
+	if err != nil || afterOff.Metadata.State != beforeAudit.Metadata.State || string(afterOff.Metadata.Capabilities) != string(beforeAudit.Metadata.Capabilities) {
+		t.Fatalf("OFF mutated board state: %+v %v", afterOff.Metadata, err)
+	}
+	stoppedVersion := offVersion + 1
+	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,false)", stoppedVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,'validate_board','LIVE')", stoppedVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewValidator(db).Validate(ctx, ashby.ID); !errors.Is(err, policy.ErrIntakeDenied) {
+		t.Fatalf("global stop was bypassed: %v", err)
 	}
 }

@@ -40,12 +40,20 @@ func NewValidator(db *sql.DB) *Validator {
 	}}
 }
 
-func (v *Validator) setResult(ctx context.Context, board Board, state string, capabilities []byte) error {
+func (v *Validator) setResult(ctx context.Context, board Board, state string, capabilities []byte, guard *intakeGuard, host string, sourceAllowed bool) error {
 	tx, err := v.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if sourceAllowed {
+		err = guard.checkCommit(ctx, tx, host)
+	} else {
+		err = guard.checkIntentCommit(ctx, tx, false)
+	}
+	if err != nil {
+		return err
+	}
 	var companyID int64
 	err = tx.QueryRowContext(ctx, `UPDATE ats_boards SET state=$6,
 		capabilities=CASE WHEN $7::jsonb IS NULL THEN capabilities ELSE capabilities || $7::jsonb END,
@@ -64,74 +72,86 @@ func (v *Validator) setResult(ctx context.Context, board Board, state string, ca
 	return tx.Commit()
 }
 
+func validationSourceDenied(err error) bool {
+	return sourceDenial(err) || errors.Is(err, policy.ErrIntakeDenied)
+}
+
+func (v *Validator) recordOutcome(ctx context.Context, board Board, guard *intakeGuard, host, outcome string, sourceAllowed bool) error {
+	if guard.mode == policy.Audit {
+		return guard.preview(ctx, fmt.Sprintf("board-%d", board.ID), map[string]any{"outcome": outcome})
+	}
+	if guard.mode != policy.Live {
+		return nil
+	}
+	state := "degraded"
+	if outcome == "blocked_by_policy" {
+		state = outcome
+	}
+	return v.setResult(ctx, board, state, nil, guard, host, sourceAllowed)
+}
+
 // Validate checks a board and records verified, degraded or policy-blocked state.
 func (v *Validator) Validate(ctx context.Context, id int64) (ValidationResult, error) {
 	board, err := (Store{DB: v.DB}).GetBoard(ctx, id)
 	if err != nil {
 		return ValidationResult{}, err
 	}
-	if !boardKeyPattern.MatchString(board.Key) || board.Key == "." || board.Key == ".." {
-		if updateErr := v.setResult(ctx, board, "degraded", nil); updateErr != nil {
-			return ValidationResult{}, updateErr
-		}
-		return ValidationResult{}, errors.New("invalid board key")
-	}
 	var host, path string
 	switch board.Provider {
 	case "greenhouse":
-		host = "boards-api.greenhouse.io"
-		path = "/v1/boards/" + url.PathEscape(board.Key)
+		host, path = "boards-api.greenhouse.io", "/v1/boards/"+url.PathEscape(board.Key)
 	case "ashby":
-		host = "api.ashbyhq.com"
-		path = "/posting-api/job-board/" + url.PathEscape(board.Key)
+		host, path = "api.ashbyhq.com", "/posting-api/job-board/"+url.PathEscape(board.Key)
 	default:
-		if updateErr := v.setResult(ctx, board, "degraded", nil); updateErr != nil {
-			return ValidationResult{}, updateErr
-		}
 		return ValidationResult{}, errors.New("unsupported board provider")
 	}
-	if err := policy.CheckGlobal(ctx, v.DB); err != nil {
-		if errors.Is(err, policy.ErrGlobalStopped) {
-			if updateErr := v.setResult(ctx, board, "blocked_by_policy", nil); updateErr != nil {
-				return ValidationResult{}, updateErr
-			}
-		}
-		return ValidationResult{}, err
+	if !boardKeyPattern.MatchString(board.Key) || board.Key == "." || board.Key == ".." {
+		return ValidationResult{}, errors.New("invalid board key")
 	}
 	boardScope := "board:" + board.Provider + ":" + board.Key
-	authorize := func(ctx context.Context, requestHost string) error {
-		if err := policy.CheckSource(ctx, v.DB, boardScope, policy.Discovery); err != nil {
-			return err
-		}
-		return policy.CheckSource(ctx, v.DB, requestHost, policy.Discovery)
-	}
-	if err := authorize(ctx, host); err != nil {
-		if errors.Is(err, policy.ErrCapabilityDenied) || errors.Is(err, policy.ErrSourceUnregistered) {
-			if updateErr := v.setResult(ctx, board, "blocked_by_policy", nil); updateErr != nil {
+	guard, err := startIntake(ctx, v.DB, board.CompanyID, "validate_board", boardScope, host)
+	if err != nil {
+		if guard != nil && guard.mode == policy.Live && validationSourceDenied(err) {
+			if updateErr := v.recordOutcome(ctx, board, guard, host, "blocked_by_policy", false); updateErr != nil {
 				return ValidationResult{}, updateErr
 			}
 		}
 		return ValidationResult{}, err
+	}
+	if guard.mode == policy.Audit {
+		// AUDIT is observational only. Fetch and return facts, but never alter board state.
+	}
+	authorize := func(ctx context.Context, requestHost string) error {
+		if requestHost != host {
+			return policy.ErrCapabilityDenied
+		}
+		return guard.authorize(ctx, requestHost)
 	}
 	fetchCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	status, data, err := v.fetch(fetchCtx, (&url.URL{Scheme: "https", Host: host, Path: path}).String(), []string{host}, authorize)
 	if err != nil {
-		state := "degraded"
-		if errors.Is(err, policy.ErrCapabilityDenied) || errors.Is(err, policy.ErrSourceUnregistered) {
-			state = "blocked_by_policy"
-		}
-		if updateErr := v.setResult(ctx, board, state, nil); updateErr != nil {
-			return ValidationResult{}, updateErr
+		if guard.mode == policy.Audit {
+			if previewErr := v.recordOutcome(ctx, board, guard, host, "blocked_or_failed", true); previewErr != nil {
+				return ValidationResult{}, previewErr
+			}
+		} else if validationSourceDenied(err) {
+			if updateErr := v.recordOutcome(ctx, board, guard, host, "blocked_by_policy", false); updateErr != nil {
+				return ValidationResult{}, updateErr
+			}
+		} else if guard.mode == policy.Live {
+			if updateErr := v.recordOutcome(ctx, board, guard, host, "degraded", true); updateErr != nil {
+				return ValidationResult{}, updateErr
+			}
 		}
 		return ValidationResult{}, err
 	}
 	if status < 200 || status >= 300 {
-		state := "degraded"
+		outcome := "degraded"
 		if status == http.StatusUnauthorized || status == http.StatusForbidden {
-			state = "blocked_by_policy"
+			outcome = "blocked_by_policy"
 		}
-		if err := v.setResult(ctx, board, state, nil); err != nil {
+		if err := v.recordOutcome(ctx, board, guard, host, outcome, true); err != nil {
 			return ValidationResult{}, err
 		}
 		return ValidationResult{}, fmt.Errorf("provider returned status %d", status)
@@ -143,8 +163,8 @@ func (v *Validator) Validate(ctx context.Context, id int64) (ValidationResult, e
 			Name string `json:"name"`
 		}
 		if err := json.Unmarshal(data, &response); err != nil || response.Name == "" {
-			if updateErr := v.setResult(ctx, board, "degraded", nil); updateErr != nil {
-				return ValidationResult{}, updateErr
+			if recordErr := v.recordOutcome(ctx, board, guard, host, "degraded", true); recordErr != nil {
+				return ValidationResult{}, recordErr
 			}
 			return ValidationResult{}, errors.New("invalid Greenhouse board response")
 		}
@@ -155,8 +175,8 @@ func (v *Validator) Validate(ctx context.Context, id int64) (ValidationResult, e
 			} `json:"jobs"`
 		}
 		if err := json.Unmarshal(data, &response); err != nil || response.Jobs == nil {
-			if updateErr := v.setResult(ctx, board, "degraded", nil); updateErr != nil {
-				return ValidationResult{}, updateErr
+			if recordErr := v.recordOutcome(ctx, board, guard, host, "degraded", true); recordErr != nil {
+				return ValidationResult{}, recordErr
 			}
 			return ValidationResult{}, errors.New("invalid Ashby board response")
 		}
@@ -172,17 +192,21 @@ func (v *Validator) Validate(ctx context.Context, id int64) (ValidationResult, e
 		}
 		result.Listed, result.Unlisted, result.Unknown = &listed, &unlisted, &unknown
 	}
+	if guard.mode == policy.Audit {
+		if err := guard.preview(ctx, fmt.Sprintf("board-%d", board.ID), map[string]any{"result": result}); err != nil {
+			return ValidationResult{}, err
+		}
+		return result, nil
+	}
 	observed := map[string]any{"public_read": true}
 	if result.Listed != nil {
-		observed["listed_jobs"] = *result.Listed
-		observed["unlisted_jobs"] = *result.Unlisted
-		observed["unknown_listing_jobs"] = *result.Unknown
+		observed["listed_jobs"], observed["unlisted_jobs"], observed["unknown_listing_jobs"] = *result.Listed, *result.Unlisted, *result.Unknown
 	}
 	capabilities, err := json.Marshal(observed)
 	if err != nil {
 		return ValidationResult{}, err
 	}
-	if err := v.setResult(ctx, board, "verified", capabilities); err != nil {
+	if err := v.setResult(ctx, board, "verified", capabilities, guard, host, true); err != nil {
 		return ValidationResult{}, err
 	}
 	return result, nil

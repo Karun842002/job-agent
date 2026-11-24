@@ -32,17 +32,9 @@ func TestAuthorisedPublicBoards(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", version); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		cleanup, err := sql.Open("pgx", databaseURL)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer cleanup.Close()
-		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM policy_versions WHERE version=$1", version); err != nil {
-			t.Error(err)
-		}
-	})
+	if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,'validate_board','LIVE')", version); err != nil {
+		t.Fatal(err)
+	}
 	suffix := fmt.Sprintf("%d", version)
 	company, err := (Store{DB: db}).CreateCompany(ctx, Company{Name: "Public board validation fixture", Domain: "public-board-fixture-" + suffix + ".example"})
 	if err != nil {

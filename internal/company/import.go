@@ -79,6 +79,10 @@ func (s Store) Import(ctx context.Context, format string, input io.Reader) (int,
 		if _, err := tx.ExecContext(ctx, "INSERT INTO company_seeds (company_id,url) VALUES ($1,$2)", id, record.CareersURL); err != nil {
 			return 0, fmt.Errorf("row %d: insert seed: %w", i+1, err)
 		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO tier_assignments(axis,target_id,tier_id,tier_version,actor,reason)
+			SELECT 'company',$1,id,version,'system','initial_default' FROM policy_tiers WHERE axis='company' AND id='UNASSIGNED'`, id); err != nil {
+			return 0, err
+		}
 		if err := auditMutation(ctx, tx, "company_imported", id); err != nil {
 			return 0, err
 		}

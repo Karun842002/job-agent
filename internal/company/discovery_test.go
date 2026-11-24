@@ -50,17 +50,11 @@ func TestDiscoveryIntegration(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", version); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		cleanup, err := sql.Open("pgx", databaseURL)
-		if err != nil {
-			t.Error(err)
-			return
+	for _, step := range []string{"discover_company", "validate_board"} {
+		if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,$2,'LIVE')", version, step); err != nil {
+			t.Fatal(err)
 		}
-		defer cleanup.Close()
-		if _, err := cleanup.ExecContext(context.Background(), "DELETE FROM policy_versions WHERE version=$1", version); err != nil {
-			t.Error(err)
-		}
-	})
+	}
 	suffix := fmt.Sprintf("%d", version)
 	host := "careers-" + suffix + ".example"
 	store := Store{DB: db}
@@ -140,5 +134,36 @@ func TestDiscoveryIntegration(t *testing.T) {
 	}
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM browser_exceptions WHERE seed_id=$1 AND reason='dynamic_review'", seed.ID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("dynamic exceptions %d: %v", count, err)
+	}
+	auditVersion := version + 1
+	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", auditVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,'discover_company','AUDIT')", auditVersion); err != nil {
+		t.Fatal(err)
+	}
+	auditKey := "audit-" + suffix
+	html = fmt.Sprintf(`<a href="https://boards.greenhouse.io/%s">audit candidate</a>`, auditKey)
+	beforeCalls := calls
+	found, err := inspector.Discover(ctx, seed.ID)
+	if err != nil || len(found) != 1 || calls != beforeCalls+1 {
+		t.Fatalf("AUDIT discovery: %+v err=%v calls=%d", found, err, calls)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM ats_boards WHERE company_id=$1 AND board_key=$2", company.ID, auditKey).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("AUDIT inserted board: count=%d err=%v", count, err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM audit_previews p JOIN effective_step_policies e ON e.id=p.policy_snapshot_id WHERE e.policy_version=$1", auditVersion).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("AUDIT discovery preview count=%d err=%v", count, err)
+	}
+	offVersion := auditVersion + 1
+	if _, err := db.ExecContext(ctx, "INSERT INTO policy_versions(version,global_enabled) VALUES($1,true)", offVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO step_defaults(policy_version,step_key,mode) VALUES($1,'discover_company','OFF')", offVersion); err != nil {
+		t.Fatal(err)
+	}
+	beforeCalls = calls
+	if _, err := inspector.Discover(ctx, seed.ID); !errors.Is(err, policy.ErrIntakeDenied) || calls != beforeCalls {
+		t.Fatalf("OFF discovery made request: err=%v calls=%d before=%d", err, calls, beforeCalls)
 	}
 }

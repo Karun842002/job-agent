@@ -195,6 +195,141 @@ paths:
       responses:
         '204': { description: Board deleted }
         '404': { description: Board not found }
+  /api/v1/tiers/companies:
+    get:
+      summary: List company tiers
+      responses:
+        '200': { description: Company tier definitions, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Tier' } } } } }
+    put:
+      summary: Create or update a company tier using its current version
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/Tier' } }
+      responses:
+        '200': { description: Saved tier and new version, content: { application/json: { schema: { $ref: '#/components/schemas/Tier' } } } }
+        '409': { description: Stale version or conflict }
+  /api/v1/tiers/roles:
+    get:
+      summary: List role tiers
+      responses:
+        '200': { description: Role tier definitions, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Tier' } } } } }
+    put:
+      summary: Create or update a role tier using its current version
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/Tier' } }
+      responses:
+        '200': { description: Saved tier and new version, content: { application/json: { schema: { $ref: '#/components/schemas/Tier' } } } }
+        '409': { description: Stale version or conflict }
+  /api/v1/tiers/{axis}/{tier}/history:
+    get:
+      summary: Read immutable tier definition history
+      parameters:
+        - in: path
+          name: axis
+          required: true
+          schema: { type: string, enum: [company, role] }
+        - in: path
+          name: tier
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Version history, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Tier' } } } } }
+  /api/v1/role-families:
+    get:
+      summary: List role families
+      parameters:
+        - in: query
+          name: after
+          schema: { type: integer, format: int64, minimum: 0 }
+      responses:
+        '200': { description: Role families, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RoleFamily' } } } } }
+    post:
+      summary: Create an UNASSIGNED role family
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/RoleFamily' } }
+      responses:
+        '201': { description: Created role family, content: { application/json: { schema: { $ref: '#/components/schemas/RoleFamily' } } } }
+  /api/v1/role-families/{id}:
+    put:
+      parameters: [{ $ref: '#/components/parameters/ID' }]
+      summary: Update a role family without changing its tier
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/RoleFamily' } }
+      responses:
+        '204': { description: Role family updated }
+        '404': { description: Role family not found }
+  /api/v1/companies/{id}/tier:
+    post:
+      parameters: [{ $ref: '#/components/parameters/ID' }]
+      summary: Assign a company tier and append assignment history
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/TierAssignmentInput' } }
+      responses:
+        '204': { description: Tier assigned }
+        '404': { description: Company not found }
+  /api/v1/role-families/{id}/tier:
+    post:
+      parameters: [{ $ref: '#/components/parameters/ID' }]
+      summary: Assign a role tier and append assignment history
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/TierAssignmentInput' } }
+      responses:
+        '204': { description: Tier assigned }
+        '404': { description: Role family not found }
+  /api/v1/tier-assignments:
+    get:
+      summary: Read assignment history for a company or role family
+      parameters:
+        - in: query
+          name: axis
+          required: true
+          schema: { type: string, enum: [company, role] }
+        - in: query
+          name: target_id
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+        - in: query
+          name: after
+          schema: { type: integer, format: int64, minimum: 0 }
+      responses:
+        '200': { description: Assignment history, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TierAssignment' } } } } }
+  /api/v1/policies/global:
+    get:
+      summary: Read the global emergency-stop state
+      responses:
+        '200': { description: Current global policy, content: { application/json: { schema: { $ref: '#/components/schemas/GlobalPolicy' } } } }
+    put:
+      summary: Set the global emergency-stop state as a new policy version
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/GlobalPolicyInput' } }
+      responses:
+        '200': { description: New policy version }
+  /api/v1/policies/steps:
+    get:
+      summary: Read default and tier-specific step modes
+      responses:
+        '200': { description: Step policy rules, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StepPolicy' } } } } }
+    put:
+      summary: Set one step mode as a new policy version
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/StepPolicyInput' } }
+      responses:
+        '200': { description: New policy version }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer }
@@ -212,6 +347,7 @@ components:
         id: { type: integer, format: int64, readOnly: true }
         name: { type: string }
         domain: { type: string }
+        tier_id: { type: string, readOnly: true }
     Seed:
       type: object
       required: [company_id, url]
@@ -248,3 +384,66 @@ components:
         listed: { type: integer, minimum: 0 }
         unlisted: { type: integer, minimum: 0 }
         unknown: { type: integer, minimum: 0 }
+    Tier:
+      type: object
+      required: [id, name, enabled, priority, settings]
+      properties:
+        id: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,63}$' }
+        axis: { type: string, enum: [company, role] }
+        name: { type: string, minLength: 1 }
+        enabled: { type: boolean }
+        priority: { type: integer }
+        settings: { type: object }
+        version: { type: integer, format: int64, minimum: 0, description: '0 creates; updates require the current version.' }
+    RoleFamily:
+      type: object
+      required: [name, criteria]
+      properties:
+        id: { type: integer, format: int64, readOnly: true }
+        name: { type: string, minLength: 1 }
+        criteria: { type: object }
+        tier_id: { type: string, readOnly: true }
+    TierAssignmentInput:
+      type: object
+      required: [tier_id, reason]
+      properties:
+        tier_id: { type: string }
+        reason: { type: string, minLength: 1, maxLength: 512 }
+    TierAssignment:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        axis: { type: string, enum: [company, role] }
+        target_id: { type: integer, format: int64 }
+        tier_id: { type: string }
+        tier_version: { type: integer, format: int64 }
+        actor: { type: string }
+        reason: { type: string }
+        created_at: { type: string }
+    GlobalPolicy:
+      type: object
+      required: [version, enabled]
+      properties:
+        version: { type: integer, format: int64 }
+        enabled: { type: boolean }
+    GlobalPolicyInput:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+    StepPolicy:
+      type: object
+      properties:
+        policy_version: { type: integer, format: int64 }
+        step_key: { type: string }
+        axis: { type: string }
+        tier_id: { type: string }
+        mode: { type: string, enum: [LIVE, AUDIT, OFF] }
+    StepPolicyInput:
+      type: object
+      required: [step_key, mode]
+      properties:
+        step_key: { type: string }
+        axis: { type: string, enum: [company, role] }
+        tier_id: { type: string }
+        mode: { type: string, enum: [LIVE, AUDIT, OFF] }
