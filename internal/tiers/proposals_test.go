@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -53,10 +54,39 @@ func TestProposePolicyAndDeduplicationIntegration(t *testing.T) {
 	}
 	store := Store{DB: db}
 	in := ProposalInput{CompanyID: company, SourceURL: "https://" + host + "/careers", Evidence: RelevanceEvidence{Matches, Matches, Matches, Matches, NoMatch}, ExpiresAt: time.Now().Add(time.Hour)}
-	id, created, err := store.Propose(ctx, in)
-	if err != nil || !created || id == 0 {
-		t.Fatalf("first proposal id=%d created=%v err=%v", id, created, err)
+	type outcome struct {
+		id      int64
+		created bool
+		err     error
 	}
+	results := make(chan outcome, 8)
+	var wg sync.WaitGroup
+	for i := 0; i < cap(results); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			id, created, err := store.Propose(ctx, in)
+			results <- outcome{id, created, err}
+		}()
+	}
+	wg.Wait()
+	close(results)
+	createdCount := 0
+	for result := range results {
+		if result.err != nil {
+			t.Fatalf("concurrent proposal: %v", result.err)
+		}
+		if result.created {
+			createdCount++
+			if result.id == 0 {
+				t.Fatal("created proposal has no ID")
+			}
+		}
+	}
+	if createdCount != 1 {
+		t.Fatalf("concurrent creation count=%d, want 1", createdCount)
+	}
+	var created bool
 	_, created, err = store.Propose(ctx, in)
 	if err != nil || created {
 		t.Fatalf("duplicate created=%v err=%v", created, err)
