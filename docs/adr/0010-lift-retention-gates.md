@@ -1,12 +1,12 @@
 # ADR-0010: Lift retention-based operating gates
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date proposed:** 2026-11-24
-- **Decision owner / approver:** Project owner; explicit acceptance pending
-- **Approval evidence:** Pending
+- **Decision owner / approver:** Project owner
+- **Approval evidence:** Project conversation, 2026-11-24: “Accept ADR and issue changes”
 - **Related GitHub Issue:** [#27](https://github.com/Karun842002/job-agent/issues/27)
 - **Issue ADR backlink:** Issue #27 decisions section
-- **Work status:** Affected work blocked pending acceptance and issue reconciliation
+- **Work status:** Unblocked following acceptance and issue reconciliation
 - **Affected specification:** FR-19, FR-30, P0-010, §12, §15.10
 - **Supersedes:** Proposed replacement of the retention-based remote export and candidate-data gates in ADR-0007; ADR-0008 continues to govern documented retention defaults.
 
@@ -43,13 +43,13 @@ Remote model telemetry may be configured and candidate-data ingestion implemente
 
 ## Resolution and Issue reconciliation
 
-- **Approved/rejected by:** Pending (human only)
-- **Date & evidence:** Pending
+- **Approved/rejected by:** Project owner
+- **Date & evidence:** 2026-11-24, project conversation: “Accept ADR and issue changes”
 - **Issue backlink:** Issue #27 decisions section
-- **Affected Issue AC revisions and reapproval:** Pending
+- **Affected Issue AC revisions and reapproval:** Owner accepted issue and specification reconciliation on 2026-11-24.
 - **Linked implementation PR:** Pending
 - **Supersession note:** Preserve ADR-0007 history; change its index status only after acceptance.
 
 ## Chronological addenda
 
-None.
+2026-11-24: The owner explicitly selected “Accept ADR and issue changes” after reviewing this proposed decision and the corresponding issue/specification reconciliation. The proposed text above records the earlier state.

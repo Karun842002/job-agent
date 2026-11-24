@@ -17,11 +17,11 @@ This file is the **index**, not another requirements specification. Each accepte
 
 | [ADR-0006](0006-relevance-qualification.md) | Deterministic relevance qualification | Accepted (owner instruction) | FR-25; P1-004; #19 | — |
 
-| [ADR-0007](0007-remote-telemetry-retention.md) | Gate remote telemetry on retention compliance | Accepted (owner instruction) | FR-19, FR-30; P0-010; #27 | — |
+| [ADR-0007](0007-remote-telemetry-retention.md) | Gate remote telemetry on retention compliance | Partially superseded by ADR-0010 | FR-19, FR-30; P0-010; #27 | — |
 
 | [ADR-0008](0008-retention-defaults.md) | Retention defaults and the 24-hour gate | Accepted (owner instruction) | FR-19, FR-30; #27 | ADR-0003 |
 
-| [ADR-0010](0010-lift-retention-gates.md) | Lift retention-based operating gates | Proposed | FR-19, FR-30; #27 | Proposed partial replacement of ADR-0007 |
+| [ADR-0010](0010-lift-retention-gates.md) | Lift retention-based operating gates | Accepted (owner instruction) | FR-19, FR-30; #27 | ADR-0007 (retention gates) |
 
 ## Minimal operating rules
 
