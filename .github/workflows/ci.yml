@@ -64,6 +64,8 @@ jobs:
           cache: true
       - name: Start local trace stack
         run: docker compose --profile observability up -d jaeger otel-collector
+      - name: Verify telemetry endpoint restrictions
+        run: sh deploy/otel/verify-entrypoint.sh
       - name: Verify redacted collector export
         run: |
           for attempt in $(seq 1 30); do
