@@ -1,12 +1,12 @@
 # ADR-0009: Resume knowledge bases as relevance evidence
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date proposed:** 2026-11-24
-- **Decision owner / approver:** Project owner; acceptance pending
-- **Approval evidence:** Pending
+- **Decision owner / approver:** Project owner
+- **Approval evidence:** Project conversation, 2026-11-24: “Acceept both ADRs”
 - **Related GitHub Issue:** [#19](https://github.com/Karun842002/job-agent/issues/19)
 - **Issue ADR backlink:** Issue #19 decisions section
-- **Work status:** Blocked pending acceptance and identification of the knowledge-base interface
+- **Work status:** Accepted; implementation must identify the application database interface and use synthetic fixtures until ingestion is permitted.
 - **Affected specification:** FR-25, P1-004, §3.4
 - **Supersedes:** None; ADR-0006 retains the approved qualification rule
 
@@ -43,8 +43,8 @@ Relevance depends on an accessible, appropriately structured source of verified 
 
 ## Resolution and Issue reconciliation
 
-- **Approved/rejected by:** Pending (human only)
-- **Date & evidence:** Pending
+- **Approved/rejected by:** Project owner
+- **Date & evidence:** 2026-11-24, project conversation: “Acceept both ADRs”
 - **Issue backlink:** Issue #19 decisions section
 - **Affected Issue AC revisions and reapproval:** Pending
 - **Linked implementation PR:** Pending
@@ -52,4 +52,4 @@ Relevance depends on an accessible, appropriately structured source of verified 
 
 ## Chronological addenda
 
-None.
+2026-11-24: The owner clarified: “The database from which the system retrieves information to curate the resume for a given job posting is what im referring to as the resume knowledge base.” The owner also responded “Acceept both ADRs” to the explicit acceptance and issue reconciliation request. This identifies the application’s resume evidence database, without specifying a concrete schema or deployed instance.

@@ -1,12 +1,12 @@
 # ADR-0008: Retention defaults and the 24-hour gate
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date proposed:** 2026-11-24
-- **Decision owner / approver:** Project owner; acceptance pending
-- **Approval evidence:** Pending
+- **Decision owner / approver:** Project owner
+- **Approval evidence:** Project conversation, 2026-11-24: “Acceept both ADRs”
 - **Related GitHub Issue:** [#27](https://github.com/Karun842002/job-agent/issues/27)
 - **Issue ADR backlink:** Issue #27 decisions section
-- **Work status:** Blocked pending acceptance and issue reconciliation
+- **Work status:** Accepted; issue reconciliation in progress. ADR-0007 remote and candidate-data gates remain as recorded until explicitly reconciled.
 - **Affected specification:** FR-19, FR-30, P0-010, §10, §12, §15.10
 - **Supersedes:** Proposed replacement of the strict 24-hour policy in ADR-0003; effects on ADR-0007 remain subject to owner confirmation.
 
@@ -43,8 +43,8 @@ Existing data and copies can remain longer than 24 hours; restoration may reintr
 
 ## Resolution and Issue reconciliation
 
-- **Approved/rejected by:** Pending (human only)
-- **Date & evidence:** Pending
+- **Approved/rejected by:** Project owner
+- **Date & evidence:** 2026-11-24, project conversation: “Acceept both ADRs”
 - **Issue backlink:** Issue #27 decisions section
 - **Issue reapproval:** Pending
 - **Linked implementation PR:** Pending
@@ -52,4 +52,4 @@ Existing data and copies can remain longer than 24 hours; restoration may reintr
 
 ## Chronological addenda
 
-None.
+2026-11-24: The owner responded “Acceept both ADRs” to the explicit request to accept ADR-0008 and ADR-0009 and reconcile affected criteria. The strict 24-hour requirement is superseded as stated above. The owner did not select an option concerning the separate remote-export and candidate-data gates, which remain pending.

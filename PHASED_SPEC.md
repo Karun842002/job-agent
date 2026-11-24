@@ -474,7 +474,7 @@ Each phase is independently deployable and must meet its exit criteria before th
 - [ ] **[P1-001]** CRUD for companies/seeds and boards; import from CSV/YAML.
 - [ ] **[P1-002]** Safe, deterministic careers-site HTML inspector for ATS URLs; on JS-only or blocked sites enqueue a **separate** browser exception for human/agent triage, never invoke the browser inside the cron process; manual board registration if blocked.
 - [ ] **[P1-003]** Editable, enabled/disabled company tiers and role tiers; explicit `UNASSIGNED` defaults; tier assignment and version history.
-- [ ] **[P1-004]** Deterministic rule-based relevance detector and deduplicated tier inbox for newly discovered companies/role categories. Qualification requires eligible geography, career evidence, reliable source, and a title or skills match (ADR-0006). LLM-enhanced explanations, if enabled later, must be a separate queued downstream step.
+- [ ] **[P1-004]** Deterministic rule-based relevance detector and deduplicated tier inbox for newly discovered companies/role categories. Qualification requires eligible geography, career evidence, reliable source, and a title or skills match (ADR-0006). Candidate information comes from the application database used to curate resumes for job postings (ADR-0009). LLM-enhanced explanations, if enabled later, must be a separate queued downstream step.
 - [ ] **[P1-005]** Harness broker test for permitted `NAVIGATE`/`READ` with origin/action allowlisting and redacted evidence.
 - [ ] **[P1-006]** Greenhouse board validator; Ashby board validator; listed/unlisted distinction.
 - [ ] **[P1-007]** Board state, capabilities, provenance, last-verified timestamp, operator overrides.
@@ -787,7 +787,7 @@ Example event (values illustrative):
 
 - Instrument HTTP server/client, provider adapters, Temporal dispatch/Activities, DB, LLM gateway, document renderer, browser broker, policy resolver and notification dispatcher. Propagate W3C trace context (`traceparent`/`tracestate`) and stable business correlation IDs across broker callbacks; do not use dynamic company/job IDs as metric labels.
 - Recommended pipeline: Go OpenTelemetry SDK → OpenTelemetry Collector with redaction/filtering/queue/retry → operational traces (Tempo/Jaeger), metrics (Prometheus-compatible/Grafana), logs (Loki or other log backend). **Use a dedicated filtered OTLP/HTTP traces exporter to Langfuse for GenAI spans**, so operational traces and LLM telemetry can be correlated but do not inadvertently copy all personal information.
-- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts. Remote telemetry export is disabled pending selection and verification of a backend that satisfies the 24-hour deletion policy (ADR-0007); synthetic local mock validation remains available.
+- Collector outages and Langfuse failures must never break job ingestion or applications. Bound in-process buffers; drop noncritical debug spans before business work, retain durable audit events, and record exporter drop counts. Remote telemetry export remains disabled under ADR-0007 pending explicit reconciliation; synthetic local mock validation remains available. The strict 24-hour deadline has been superseded by ADR-0008.
 - Set role-based access controls and retention for logs, traces, images and audit events. Redact tokens, cookies, browser profiles, emails, CV details, full prompt content and form values by default.
 
 ### 12.3 Langfuse LLM observability (required)
@@ -967,7 +967,7 @@ A phase is **done** only when implementation, tests, docs, observability, rollba
 7. **Work authorisation / compensation:** user-entered verified preferences, not inference.
 8. **Board-coverage metrics:** report observed boards, not the false promise of universal employer coverage.
 9. **Submission API:** expect manual-only in most cases; employer-level credentials must be verified before implementation.
-10. **Retention:** automatically delete personal data, diagnostic logs and traces, and audit events 24 hours after creation, including copies. Enforce and verify this policy before ingesting real candidate data. See [ADR-0003](docs/adr/0003-24-hour-retention.md).
+10. **Retention:** document actual configured retention and tool defaults for personal data, diagnostic logs, traces, audit events and copies; use tool defaults where configuration is unavailable. Defaults may retain data indefinitely and must not be represented as a deletion guarantee. ADR-0008 supersedes ADR-0003’s strict 24-hour deadline. The separately recorded remote export and real candidate ingestion gates remain pending explicit reconciliation (ADR-0007).
 11. **Harness connection:** the agent runtime supports a system browser but its exact invocation/callback interface is deployment-specific; keep a mockable adapter and do not invent an SDK.
 12. **Tier defaults:** company and role tiers are user-defined; examples in §13 are illustrative and disabled/unassigned states must fail closed.
 13. **Dry run:** always simulate externally visible writes; some browser forms autosave and cannot safely be filled in production audit mode.
